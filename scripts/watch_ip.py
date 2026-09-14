@@ -41,6 +41,8 @@ def main():
     p.add_argument("-i", "--interval", type=int, default=30, help="重试间隔秒数，默认 30")
     p.add_argument("-m", "--max-attempts", type=int, default=0, help="最多试几次，0=不限")
     p.add_argument("--draft", action="store_true", help="白名单生效后自动建草稿")
+    p.add_argument("--no-preflight", action="store_true",
+                   help="配合 --draft：建草稿时跳过发布前体检")
     args = p.parse_args()
 
     args.config = publish.resolve_config_path(args.config)
@@ -102,6 +104,8 @@ def main():
         print("-" * 58)
         print("接着建草稿 ...")
         sys.argv = ["publish.py", "draft", "-c", args.config]
+        if args.no_preflight:
+            sys.argv.append("--no-preflight")
         publish.main()
 
 

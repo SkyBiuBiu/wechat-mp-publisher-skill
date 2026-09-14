@@ -8,12 +8,17 @@
 
 用法：
     python publish.py check      # 只验证凭证 + IP 白名单，不发任何内容
-    python publish.py draft      # 建草稿（默认，安全）
+    python publish.py preflight  # 只做发布前体检（字数/图片/排版/合规），不连微信
+    python publish.py draft      # 建草稿（默认，安全）。发请求前会自动跑一次体检
     python publish.py publish    # 建草稿并立即正式发布（会二次确认）
     python publish.py publish --media-id XXX   # 直接发布草稿箱里已有的某篇，不重复建稿
     python publish.py list       # 列出草稿箱
     python publish.py delete --media-id XXX -y   # 删除指定草稿
     python publish.py token -f   # 强制刷新 access_token
+
+    draft 相关逃生口：
+    --no-preflight   跳过发布前体检（不建议）
+    --no-compliance  体检时跳过广告法/导流/金融等合规词扫描
 
 官方接口文档：
     token      GET  /cgi-bin/token
@@ -325,9 +330,41 @@ DIGEST_MAX = 120
 CONTENT_MAX_CHARS = 20000
 
 
+def run_preflight(cfg_path, with_compliance=True, quiet=False):
+    """发布前体检。由同目录的 preflight.py 提供，P0 未通过则中止流程。
+
+    为什么要在建草稿前跑：字数超限、图片超过 1MB、外链图这类问题，
+    等微信报错时只知道 errcode，还得回来翻文件；本地先查一遍省一个来回。
+    """
+    if not os.path.isfile(os.path.join(HERE, "preflight.py")):
+        out("[i] 没找到 preflight.py，跳过体检")
+        return 0
+    if HERE not in sys.path:
+        sys.path.insert(0, HERE)
+    try:
+        import preflight
+    except ImportError as e:
+        out("[i] 体检模块加载失败（{}），跳过".format(e))
+        return 0
+
+    out("== 发布前体检（draft 自动执行，--no-preflight 可跳过）==")
+    rc = preflight.run(cfg_path, with_compliance=with_compliance, quiet=quiet)
+    if rc != 0:
+        die("体检未通过：上面标 P0 的问题必须先在本地修掉。\n"
+            "    确要跳过体检强行建草稿：加 --no-preflight（不建议，微信那一步通常也会失败）")
+    return rc
+
+
 def cmd_draft(cfg, args):
     art = cfg.get("article", {})
     base_dir = os.path.dirname(os.path.abspath(args.config))
+
+    # ---- 发布前体检：本地先拦掉会因为平台约束翻车的内容
+    if getattr(args, "no_preflight", False):
+        out("[i] 已跳过发布前体检（--no-preflight）")
+    else:
+        run_preflight(args.config,
+                      with_compliance=not getattr(args, "no_compliance", False))
 
     # ---- 标题/作者/摘要长度校验（微信的硬限制，超了直接报错更省事）
     title = (art.get("title") or "").strip()
@@ -461,8 +498,10 @@ def main():
         description="微信公众号图文发布工具（零依赖）",
         formatter_class=argparse.RawDescriptionHelpFormatter,
         epilog=__doc__)
-    p.add_argument("action", choices=["check", "draft", "publish", "list", "delete", "token"],
-                   help="check=自检 / draft=建草稿 / publish=建草稿并发布 / list=看草稿箱 / "
+    p.add_argument("action",
+                   choices=["check", "preflight", "draft", "publish", "list", "delete", "token"],
+                   help="check=自检 / preflight=发布前体检 / draft=建草稿 / "
+                        "publish=建草稿并发布 / list=看草稿箱 / "
                         "delete=删草稿（需 --media-id）/ token=刷新凭证")
     p.add_argument("-c", "--config", default=None,
                    help="配置文件路径。默认按 当前目录/config.json → 脚本目录/config.json 查找")
@@ -472,6 +511,14 @@ def main():
                    help="发布时跳过交互确认（危险，脚本化场景才用）")
     p.add_argument("--media-id", default=None,
                    help="配合 publish 使用：直接发布这条已存在的草稿，不重新建草稿")
+    p.add_argument("--no-preflight", action="store_true",
+                   help="draft 前不跑发布前体检（不建议，体检能提前拦掉字数/图片/排版问题）")
+    p.add_argument("--no-compliance", action="store_true",
+                   help="体检时跳过广告法/导流/金融等合规词扫描")
+    p.add_argument("--warn-only", action="store_true",
+                   help="配合 preflight 使用：即使有 P0 也返回退出码 0")
+    p.add_argument("--json", dest="as_json", action="store_true",
+                   help="配合 preflight 使用：输出 JSON 结果，便于 CI 消费")
     args = p.parse_args()
 
     if args.action == "publish" and not args.media_id:
@@ -481,6 +528,22 @@ def main():
         args.publish = False
 
     args.config = resolve_config_path(args.config)
+
+    # 体检不碰网络、也不需要凭证，所以放在 load_config 之前，
+    # 这样 appid 还没配好时也能先查内容和排版。
+    if args.action == "preflight":
+        if HERE not in sys.path:
+            sys.path.insert(0, HERE)
+        try:
+            import preflight
+        except ImportError as e:
+            die("无法加载体检模块 {}：{}".format(os.path.join(HERE, "preflight.py"), e))
+        sys.exit(preflight.run(args.config,
+                               with_compliance=not args.no_compliance,
+                               warn_only=args.warn_only,
+                               as_json=args.as_json,
+                               quiet=False))
+
     cfg = load_config(args.config)
 
     if args.action == "check":
