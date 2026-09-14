@@ -9,7 +9,8 @@
 用法：
     python publish.py check      # 只验证凭证 + IP 白名单，不发任何内容
     python publish.py preflight  # 只做发布前体检（字数/图片/排版/合规），不连微信
-    python publish.py draft      # 建草稿（默认，安全）。发请求前会自动跑一次体检
+    python publish.py enhance    # 只做内容增强（mermaid 渲染 + 代码块重建），不连微信
+    python publish.py draft      # 建草稿（默认，安全）。发请求前会自动增强+体检
     python publish.py publish    # 建草稿并立即正式发布（会二次确认）
     python publish.py publish --media-id XXX   # 直接发布草稿箱里已有的某篇，不重复建稿
     python publish.py list       # 列出草稿箱
@@ -17,6 +18,7 @@
     python publish.py token -f   # 强制刷新 access_token
 
     draft 相关逃生口：
+    --no-enhance     跳过内容增强（mermaid 渲染 + 代码块重建）
     --no-preflight   跳过发布前体检（不建议）
     --no-compliance  体检时跳过广告法/导流/金融等合规词扫描
 
@@ -355,9 +357,33 @@ def run_preflight(cfg_path, with_compliance=True, quiet=False):
     return rc
 
 
+def run_enhance(cfg_path, force=False):
+    """内容增强：mermaid 渲染成 PNG、代码块重建为内联样式卡片。
+
+    由 enhance_content.py 提供。draft 自动执行（auto 模式：没有可增强内容
+    就不动文件）。返回 2 表示有渲染失败残留，体检会以 WX216 拦截，不在此中断。
+    """
+    if not os.path.isfile(os.path.join(HERE, "enhance_content.py")):
+        return 0
+    if HERE not in sys.path:
+        sys.path.insert(0, HERE)
+    try:
+        import enhance_content
+    except ImportError as e:
+        out("[i] 内容增强模块加载失败（{}），跳过".format(e))
+        return 0
+    return enhance_content.run(cfg_path, mode="all" if force else "auto")
+
+
 def cmd_draft(cfg, args):
     art = cfg.get("article", {})
     base_dir = os.path.dirname(os.path.abspath(args.config))
+
+    # ---- 内容增强：mermaid/代码块在体检前预处理成公众号兼容形态
+    if getattr(args, "no_enhance", False):
+        out("[i] 已跳过内容增强（--no-enhance）")
+    else:
+        run_enhance(args.config)
 
     # ---- 发布前体检：本地先拦掉会因为平台约束翻车的内容
     if getattr(args, "no_preflight", False):
@@ -499,7 +525,7 @@ def main():
         formatter_class=argparse.RawDescriptionHelpFormatter,
         epilog=__doc__)
     p.add_argument("action",
-                   choices=["check", "preflight", "draft", "publish", "list", "delete", "token"],
+                   choices=["check", "preflight", "enhance", "draft", "publish", "list", "delete", "token"],
                    help="check=自检 / preflight=发布前体检 / draft=建草稿 / "
                         "publish=建草稿并发布 / list=看草稿箱 / "
                         "delete=删草稿（需 --media-id）/ token=刷新凭证")
@@ -511,6 +537,8 @@ def main():
                    help="发布时跳过交互确认（危险，脚本化场景才用）")
     p.add_argument("--media-id", default=None,
                    help="配合 publish 使用：直接发布这条已存在的草稿，不重新建草稿")
+    p.add_argument("--no-enhance", action="store_true",
+                   help="draft 前不做内容增强（mermaid 渲染 + 代码块重建）")
     p.add_argument("--no-preflight", action="store_true",
                    help="draft 前不跑发布前体检（不建议，体检能提前拦掉字数/图片/排版问题）")
     p.add_argument("--no-compliance", action="store_true",
@@ -543,6 +571,16 @@ def main():
                                warn_only=args.warn_only,
                                as_json=args.as_json,
                                quiet=False))
+
+    if args.action == "enhance":
+        if HERE not in sys.path:
+            sys.path.insert(0, HERE)
+        try:
+            import enhance_content
+        except ImportError as e:
+            die("无法加载内容增强模块 {}：{}".format(
+                os.path.join(HERE, "enhance_content.py"), e))
+        sys.exit(enhance_content.run(args.config, mode="all"))
 
     cfg = load_config(args.config)
 

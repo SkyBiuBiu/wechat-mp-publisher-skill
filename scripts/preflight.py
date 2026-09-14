@@ -310,8 +310,8 @@ def check_content(cfg, base_dir, findings, stats):
         add(findings, P0, "WX008", "正文超过 2 万字符",
             "当前 {} 字符，超 {} 字符（按 HTML 长度计，不是纯文本字数）".format(
                 n_chars, n_chars - L_CONTENT_CHARS),
-            "把代码块和图表改成 PNG 截图（单块能从数千字符压到百余字符），"
-            "或按章节拆成系列")
+            "把代码块用 enhance_content.py 重建（内联样式卡片比裸 HTML 省大量字符）、"
+            "mermaid 渲染成 PNG，或按章节拆成系列")
     elif n_chars >= L_CONTENT_CHARS * NEAR_RATIO:
         add(findings, P1, "WX101", "正文接近 2 万字符上限",
             "当前 {} 字符（{:.0f}%），再补内容就会超".format(
@@ -365,6 +365,9 @@ def check_content(cfg, base_dir, findings, stats):
 
     # ---- 排版
     check_layout(content, findings, stats)
+
+    # ---- 代码块与 mermaid
+    check_code_blocks(content, findings)
 
     # ---- 摘要与「阅读原文」的一致性
     if not (art.get("content_source_url") or "").strip():
@@ -503,6 +506,29 @@ def check_layout(content, findings, stats):
         if v < 1.6:
             add(findings, P2, "WX210", "行高偏紧",
                 "line-height: {}".format(v), "正文行高 1.75-1.9 在手机上最舒服")
+
+
+def check_code_blocks(content, findings):
+    """未渲染的 mermaid / markdown 围栏 + 代码块内联样式完整性。"""
+    fences = re.findall(r"(?m)^[ \t]*```", content)
+    mmd_blocks = re.findall(r'class\s*=\s*["\'][^"\']*mermaid[^"\']*["\']', content)
+    if fences or mmd_blocks:
+        add(findings, P1, "WX216", "正文残留 Markdown 围栏或 mermaid 源码",
+            "发现 {} 处 ``` 围栏、{} 处 mermaid 块，原样发出去就是一段乱码".format(
+                len(fences), len(mmd_blocks)),
+            "跑 python scripts/enhance_content.py -c config.json："
+            "mermaid 渲染成 PNG，代码块重建为内联样式卡片")
+
+    bad_ws = 0
+    for m in re.finditer(r"<(pre|code)\b[^>]*>", content, re.I):
+        if "white-space" not in m.group(0).lower():
+            bad_ws += 1
+    if bad_ws:
+        add(findings, P1, "WX217", "代码块缺 white-space 内联样式",
+            "发现 {} 个 <pre>/<code> 没写 white-space:pre-wrap，"
+            "公众号会折叠空白，缩进和换行全丢".format(bad_ws),
+            "用 enhance_content.py 重建代码块（含语法高亮与长按复制支持），"
+            "或给每个 pre/code 补内联样式")
 
 
 def check_compliance(content, findings):
