@@ -1,6 +1,6 @@
 ---
 name: wechat-mp-publisher
-description: 微信公众号图文发布技能。当用户要求「发公众号」「发一篇公众号文章/推文」「推到公众号草稿箱」「公众号排版发布」「把这篇发到微信公众号」时使用。支持六种可选的图文风格路线（工程橙/极简纸感/终端绿/杂志暖调/商务蓝/清单问答）与自定义 token，发布前自动做平台约束体检（标题 32 字、作者 16 字、摘要 120 字、正文 2 万字符、图片体积与格式、外链图、排版与合规风险词），再通过微信官方 API 完成 access_token 获取、正文图片上传换链、封面永久素材上传、图文草稿创建，并可选正式发布。内置错误码中文翻译、IP 白名单诊断与白名单生效轮询。
+description: 微信公众号图文发布技能。当用户要求「发公众号」「发一篇公众号文章/推文」「推到公众号草稿箱」「公众号排版发布」「把这篇发到微信公众号」时使用。支持六种可选的图文风格路线（工程橙/极简纸感/终端绿/杂志暖调/商务蓝/清单问答）与自定义 token；mermaid 图渲染成 PNG、代码围栏重建为可长按复制的内联高亮卡片（不转图片），发布前自动做平台约束体检（标题 32 字、作者 16 字、摘要 120 字、正文 2 万字符、图片体积与格式、外链图、排版与合规风险词），再通过微信官方 API 完成 access_token 获取、正文图片上传换链、封面永久素材上传、图文草稿创建，并可选正式发布。内置错误码中文翻译、IP 白名单诊断与白名单生效轮询。
 agent_created: true
 ---
 
@@ -94,7 +94,7 @@ python <skill>/scripts/apply_style.py --style-file my-style.json -o article.html
 | 外链图 | **不允许**，会被静默过滤 | 不报错，图直接没了 |
 | `<style>` / `class` / JS | 会被剥离 | 不报错，样式全丢 |
 
-> **正文字符数按 HTML 长度算，不是纯文本字数**。这是最容易误判的一条：代码块多、标签多的文章，纯文本才 4000 字也可能撞上 2 万字符上限。突破手段是把代码块和图表改成 PNG 截图（见第十节）。
+> **正文字符数按 HTML 长度算，不是纯文本字数**。这是最容易误判的一条：代码块多、标签多的文章，纯文本才 4000 字也可能撞上 2 万字符上限。突破手段：mermaid 渲染成 PNG、代码块交给 enhance_content.py 重建（见第四步），仍超就拆篇（见第十节）。
 
 ## 五、工作流程
 
@@ -127,13 +127,23 @@ python <skill>/scripts/apply_style.py -o wechat-publish/article.html
 - **不要用外部图片链接**，微信会静默过滤外链图。
 - 不要用 `h1`~`h6`（样式被平台覆盖），小标题用加粗 `<p>`。
 - 按第三节的写作约束组织文字，对照所选预设的 `writing` 段自查一遍。
+- **mermaid 直接写 ```mermaid 围栏**：发布前 `enhance_content.py` 渲染成 PNG 替换（公众号剥 JS 与 SVG 文字，PNG 是唯一稳妥形态）。
+- **代码直接写 ```python 等围栏**或 `<pre><code>`：会被重建为内联样式高亮卡片，手机长按可复制——不要把代码转成图片。
 - 详细标签约束见 `references/wechat-api-reference.md` 第五节。
 
-### Step 4：发布前体检
+### Step 4：内容增强 + 发布前体检
 
 ```bash
+# mermaid 围栏渲染成 PNG、代码围栏/<pre><code> 重建为内联高亮卡片（就地更新，自动留 .bak）
+python <skill>/scripts/enhance_content.py -c wechat-publish/config.json
+
+# 体检（draft 也会自动执行这两步）
 python <skill>/scripts/preflight.py -c wechat-publish/config.json
 ```
+
+增强说明：本地装了 mmdc（`npm i -g @mermaid-js/mermaid-cli`）就走本地渲染；
+没装且 config 未关 `mermaid.remote` 时走 mermaid.ink 远程渲染（图表内容会发给
+第三方服务，涉密图表别开）。两者都不可用时 mermaid 源码原样保留，体检报 WX216。
 
 不连微信、不需要凭证，纯本地检查，输出 **P0 阻断 / P1 警告 / P2 建议** 三级清单，每项带「现象 + 处理」。
 
@@ -170,6 +180,7 @@ python <skill>/scripts/publish.py draft -c wechat-publish/config.json
 |---|---|
 | `publish.py check` | 验凭证 + 白名单，不发内容 |
 | `publish.py preflight` | 只做发布前体检，不连微信、不需要凭证 |
+| `publish.py enhance` | 内容增强：mermaid 渲染成 PNG、代码块重建为高亮卡片，不连微信 |
 | `publish.py draft` | 建草稿（安全档，推荐默认）。发请求前自动跑体检 |
 | `publish.py publish` | 建草稿并立即发布 |
 | `publish.py publish --media-id XXX -y` | 发布草稿箱里已有的一篇 |
@@ -177,6 +188,7 @@ python <skill>/scripts/publish.py draft -c wechat-publish/config.json
 | `publish.py delete --media-id XXX -y` | 删除指定草稿（破坏性，需显式给 id） |
 | `publish.py token -f` | 强制刷新 access_token（遇 40001 时用） |
 | `preflight.py -c 配置` | 体检单独跑：`--json` / `--warn-only` / `--no-compliance` |
+| `enhance_content.py -c 配置` | 单独跑内容增强：`mermaid` / `code` 子命令、`--dry-run`、`-o 写到别处` |
 | `apply_style.py --list` | 列出风格预设 |
 | `apply_style.py --preset X -o 文件` | 按预设渲染正文骨架 |
 | `apply_style.py --preset X --dump 文件` | 导出成可编辑的自定义预设 |
@@ -196,7 +208,7 @@ python <skill>/scripts/publish.py draft -c wechat-publish/config.json
 - 报 **40007**：封面素材缺失。`cover_file` 没配或文件路径错了，体检的 `WX016/WX017` 会提前拦。
 - 报 **40005 / 40009**：正文图格式或体积不对，体检的 `WX014/WX015` 会提前拦。
 - 正文图片不显示：用了外链图。改成 `<img src="assets/xxx.png">` 的本地相对路径写法。
-- 正文超 2 万字符：先确认是**HTML 长度**不是纯文本字数。把代码块与图表截图成 PNG 是最有效的压降手段。
+- 正文超 2 万字符：先确认是**HTML 长度**不是纯文本字数。mermaid 渲染成 PNG、代码块交给 `enhance_content.py` 重建是最有效的压降手段，仍超就拆篇（第十节）。
 - 发布提交成功但后台看不到：`errcode=0` 只代表任务提交成功，发布有延迟，最终结果走事件推送。
 - 完整错误码表见 `references/wechat-api-reference.md` 第三节。
 
@@ -230,8 +242,8 @@ python <skill>/scripts/publish.py draft -c wechat-publish/config.json
 
 把现成 HTML 文档（深色设计系统、Mermaid 图、高亮代码块）转成公众号图文时，三个硬约束：正文 ≤2 万字符；`<script>`/`<style>`/class 全被剥掉；外链图被静默过滤。实测可行的管线：
 
-1. **JS 渲染的图表（Mermaid 等）→ 截成 PNG**。用 playwright（channel 走系统 Chrome，无需下载浏览器）+ 本地 mermaid 包渲染，`element.screenshot()` + deviceScaleFactor 2~3 保证清晰度；正文以 `<img src="assets/xxx.png">` 引用，走脚本自动上传换链。
-2. **代码块也建议截图成 PNG**：既保留语法高亮（公众号 `<pre>` 排版不可靠），又把单块体积从数千字符压到百余字符——这是突破 2 万字符上限的关键一步。注意截图前把 `overflow` 改 `visible`、宽度 `max-content`，否则长行被裁切。
+1. **mermaid 图 → `enhance_content.py` 渲染成 PNG**。脚本自动把 ```mermaid 围栏替换成 `<img src="assets/mermaid-N.png">`（本地 mmdc 优先，mermaid.ink 远程兜底），走脚本自动上传换链，不再需要手动 playwright 截图。
+2. **代码块不要转图片**：`enhance_content.py code` 把 ``` 围栏与 `<pre><code>` 重建为内联样式高亮卡片（缩进 `&nbsp;`、换行 `<br>` 双保险），文字可选中、手机长按即复制——公众号剥 `<script>`，JS 一键复制按钮活不下来，「长按复制」是唯一可靠路径。代码卡片同时比裸 HTML 省大量字符，是压降 2 万字符上限的主力。
 3. **深色设计系统 → 浅色内联样式**：正文转白底配色（文字 #333/#4a5460、卡片 #f7f8fa、强调色加深到可读档），代码块保留深色底；`display:grid`/CSS 变量（`var(--c)`）公众号不可靠，须在转换时解析成具体颜色，多栏布局改纵向堆叠。
 4. **拆篇**：按章节组成每篇 ≤1.9 万字符的系列（通常 2-5 篇），标题用「主题①/②/③」编号，每篇独立 config（独立封面）逐篇跑 `draft`；篇尾加系列导航。
 5. **推送前用 playwright 以 414px 视口截图抽查**排版（表格换行、图片宽度、锚点残留——站内锚点 `<a href="#...">` 要降级成 `<span>`）。

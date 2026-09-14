@@ -20,6 +20,20 @@
     }
   },
 
+  "_code": "代码块重建。highlight=离线语法高亮；copy_hint=卡片头部显示「长按复制」提示",
+  "code": {
+    "highlight": true,
+    "copy_hint": true
+  },
+
+  "_mermaid": "mermaid 图渲染为 PNG（公众号剥 JS 与 SVG 文字）。remote=true 且本地没装 mmdc 时走 mermaid.ink 在线渲染，图表内容会发给该第三方服务；涉密内容请本地安装 mmdc（npm i -g @mermaid-js/mermaid-cli）并设 remote=false",
+  "mermaid": {
+    "remote": true,
+    "scale": 2,
+    "width": 800,
+    "dir": "assets"
+  },
+
   "article": {
     "_title": "标题，硬上限 32 个字，超了微信直接报错",
     "title": "在这里填文章标题（上限 32 字）",

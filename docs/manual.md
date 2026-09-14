@@ -202,6 +202,18 @@ python scripts/apply_style.py --preset terminal-green -o work/article.html
 
 > 模板第 8 块引用了示例图 `assets/diagram.png`。没有这张图体检会报 `WX012`，放上自己的图或把那一块整段删掉。
 
+### mermaid 图和代码块
+
+直接在正文里写 ```mermaid 围栏和 ```lang 代码围栏（或 `<pre><code>`），然后：
+
+```bash
+python scripts/enhance_content.py -c work/config.json
+```
+
+- mermaid 围栏渲染成 PNG 放进 `assets/`，正文替换为 `<img>`。本地装了 mmdc 就本地渲染；没装会用 mermaid.ink 在线渲染（图表内容会发给该第三方服务，涉密内容装 mmdc 后在 config 设 `"mermaid": {"remote": false}`）。
+- 代码围栏重建为内联样式高亮卡片，**不转图片**：文字可选中，手机上长按代码即可复制（公众号剥 `<script>`，JS 复制按钮活不下来，长按复制是唯一可靠路径）。
+- 就地更新前自动留 `article.html.bak` 备份；`--dry-run` 只报告不写；`draft` 前会自动执行，`--no-enhance` 可跳过。
+
 更细的标签与样式约束见 [`references/wechat-api-reference.md`](../references/wechat-api-reference.md) 第五节。
 
 ### 想批量生成封面和配图
@@ -292,7 +304,7 @@ python scripts/publish.py preflight -c work/config.json        # 等价写法
 - **合规词（`WX114`）是风险提示，不是违规判定。** 只说明这句话值得人工过一眼，
   「唯一标识」这类技术术语会被误报。它不替代人工审核。
 - **判定依据分三类**：官方硬约束（必须改）、实测行为（改了更稳）、经验阈值（自行判断）。
-  全部 49 条检查项依据的标注见 [`references/wechat-api-reference.md`](../references/wechat-api-reference.md) 第六节。
+  全部 51 条检查项依据的标注见 [`references/wechat-api-reference.md`](../references/wechat-api-reference.md) 第六节。
 
 ---
 

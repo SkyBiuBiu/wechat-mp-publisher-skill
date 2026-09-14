@@ -37,6 +37,7 @@ REQUIRED = [
     "CHANGELOG.md",
     "scripts/publish.py",
     "scripts/preflight.py",
+    "scripts/enhance_content.py",
     "scripts/apply_style.py",
     "scripts/watch_ip.py",
     "scripts/make_assets.py",

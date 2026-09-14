@@ -74,8 +74,8 @@
     引用内容。
   </section>
 
-  <!-- 块 10 · 代码块：公众号 <pre> 排版不可靠，长代码建议截图成 PNG；
-       短代码用下面这层 section，等宽字体 + 深底，且必须写 white-space:pre-wrap -->
+  <!-- 块 10 · 代码块：直接写 ```lang 围栏或 <pre><code>，发布前跑
+       enhance_content.py 会重建成下面这层形态（语法高亮 + 长按复制）。别转成图片 -->
   <section style="margin:0 0 {{para_margin}};padding:14px 16px;background:{{code_bg}};border-radius:{{radius}};">
     <p style="margin:0;font-family:Consolas,Monaco,monospace;font-size:13px;line-height:1.7;color:{{code_text}};white-space:pre-wrap;word-break:break-all;">python scripts/publish.py draft -c work/config.json</p>
   </section>

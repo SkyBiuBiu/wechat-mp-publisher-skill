@@ -16,6 +16,32 @@
 - 封面裁剪比例 `cover_info.crop_percent_list` 支持（`2.35_1` / `1_1`）
 - 图片消息（`article_type=newspic`）支持
 
+## [0.3.0] - 2026-09-14
+
+两条新能力：**mermaid 渲染**与**代码块重建**（不转图片、可复制），
+由新增的 `scripts/enhance_content.py` 提供，`draft` 前自动执行。
+
+### Added
+
+- `scripts/enhance_content.py` —— 内容增强器，零依赖
+  - `mermaid`：```mermaid 围栏 / `<div class="mermaid">` 渲染成 PNG 并替换为
+    `<img>`（本地 mmdc 优先，mermaid.ink 远程兜底；公众号剥 JS 与 SVG 文字，
+    PNG 是唯一稳妥形态）。涉密图表可设 `mermaid.remote: false` 强制本地渲染
+  - `code`：```lang 围栏与 `<pre><code>` 重建为全内联样式代码卡片：
+    深底 + 语言徽标 + 离线语法高亮（python / js / java / go / bash / json /
+    yaml / sql / html / css / diff），缩进 `&nbsp;`、换行 `<br>` 双保险，
+    文字可选中、手机长按即复制——不转图片
+  - 就地更新自动留 `.bak`；`--dry-run` / `-o` / `--no-highlight` / `--no-copy-hint` 可选
+- `publish.py enhance` 子命令；`draft` 前自动跑增强，`--no-enhance` 跳过
+- preflight 新增 2 条 P1（总规则 49 → 51）：`WX216` 残留 Markdown 围栏 /
+  mermaid 源码、`WX217` `<pre>`/`<code>` 缺内联 `white-space` 样式
+- 预设 JSON 支持可选 `code_highlight` 段覆盖高亮配色（默认按 `code_bg` 明暗自动选板）
+
+### Changed
+
+- `draft` 流程变为：增强 → 体检 → 取 token → 换链 → 建稿
+- 体检 WX008 的处理建议更新为增强管线，不再建议把代码截图成图片
+
 ## [0.2.0] - 2026-09-14
 
 两条线：**发布前约束体检**（把会翻车的地方在本地拦掉）与

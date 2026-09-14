@@ -40,6 +40,7 @@
 - **发布前约束体检** —— `preflight.py` 在本地把会翻车的地方拦掉：标题 32 字、作者 16 字、
   摘要 120 字、正文 2 万字符 / 1MB、图片体积与格式、外链图、会被剥离的 HTML 写法、
   排版问题、广告法与导流风险词。分 **P0 阻断 / P1 警告 / P2 建议** 三级，每项给处理办法
+- **mermaid + 代码块增强** —— `enhance_content.py` 把 ```mermaid 围栏渲染成 PNG（本地 mmdc 优先、mermaid.ink 远程兜底），代码围栏重建为内联样式高亮卡片：**不转图片、手机长按可复制**
 - **零第三方依赖** —— 所有脚本只用 Python 标准库，Windows / Linux 通用，拷过去就能跑
 - **正文图片自动换链** —— 正文里写 `<img src="assets/xx.png">` 本地相对路径，脚本先传微信图床再替换 `src`（外链图会被微信静默过滤）
 - **错误码中文翻译** —— 微信的 `errcode` 直接翻成人话和处置建议；`40164` 还会自动从 `errmsg` 里抠出被拒的 IP
@@ -156,7 +157,7 @@ P2 · 建议 · 3 项          ← 不影响发布，改了更好
 有 P0 时退出码为 1，`draft` 会就地停下（此时还没发任何请求）。
 `--warn-only` 只报告不拦截，`--json` 给 CI 消费，`--no-compliance` 跳过合规词扫描。
 
-49 条检查项的判定依据（**官方硬约束 / 实测行为 / 经验阈值**）见
+51 条检查项的判定依据（**官方硬约束 / 实测行为 / 经验阈值**）见
 [`references/wechat-api-reference.md`](references/wechat-api-reference.md) 第六节。
 
 ## 命令参考
@@ -169,7 +170,8 @@ python scripts/publish.py <子命令> [参数]
 |---|---|
 | `check` | 验凭证 + 白名单，不发内容。**动手前先跑这个** |
 | `preflight` | 只做发布前体检，不连微信、不需要凭证 |
-| `draft` | 建草稿（推荐默认档）：体检 → 取 token → 正文图换链 → 传封面素材 → 建草稿 → 回查确认 |
+| `enhance` | 内容增强：mermaid 渲染成 PNG、代码块重建为高亮卡片，不连微信 |
+| `draft` | 建草稿（推荐默认档）：增强+体检 → 取 token → 正文图换链 → 传封面素材 → 建草稿 → 回查确认 |
 | `publish` | 建草稿并立即正式发布。粉丝会收到推送，不可撤回 |
 | `publish --media-id <id> -y` | 发布草稿箱里**已有**的一篇，不重复建稿 |
 | `list` | 列出草稿箱 |
@@ -184,6 +186,7 @@ python scripts/publish.py <子命令> [参数]
 | `-f, --force` | 忽略本地 token 缓存，强制重新获取 |
 | `-y, --yes` | 跳过交互确认（仅脚本化场景使用） |
 | `--no-preflight` | `draft` 前不跑体检（不建议） |
+| `--no-enhance` | `draft` 前不做内容增强 |
 | `--no-compliance` | 体检时跳过广告法/导流/金融等合规词扫描 |
 | `--warn-only` | 配合 `preflight`：有 P0 也返回 0 |
 | `--json` | 配合 `preflight`：输出结构化 JSON |
@@ -194,6 +197,7 @@ python scripts/publish.py <子命令> [参数]
 |---|---|
 | `scripts/apply_style.py` | 风格渲染：`--list` / `--preset` / `--set` / `--style-file` / `--dump` |
 | `scripts/preflight.py` | 发布前体检：P0/P1/P2 三级清单，`--json` / `--warn-only` / `--no-compliance` |
+| `scripts/enhance_content.py` | 内容增强：mermaid → PNG（mmdc / mermaid.ink），代码块 → 高亮卡片，`mermaid`/`code` 子命令、`--dry-run` |
 | `scripts/watch_ip.py` | 轮询等白名单生效，通了自动建草稿。`-i 秒` 调间隔，`-m 次数` 限次，`--no-preflight` 透传 |
 | `scripts/make_assets.py` | 生成封面（900×383）和正文插图，需 `pillow`，`--title/--subtitle/--date` 可配 |
 | `scripts/validate_skill.py` | 仓库自检：结构 / frontmatter / 版本 / 语法 / 密钥 / 引用 / 预设一致性 |
@@ -234,6 +238,7 @@ wechat-mp-publisher/
 ├── scripts/
 │   ├── publish.py                  # 主脚本（零依赖）
 │   ├── preflight.py                # 发布前体检：约束 / 排版 / 合规
+│   ├── enhance_content.py          # 内容增强：mermaid 渲染 + 代码块重建
 │   ├── apply_style.py              # 风格渲染：预设 token → 正文骨架
 │   ├── watch_ip.py                 # 白名单生效轮询
 │   ├── make_assets.py              # 封面 / 配图生成（需 pillow）
