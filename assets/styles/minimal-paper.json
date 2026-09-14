@@ -1,0 +1,34 @@
+{
+  "_说明": "风格预设：极简纸感。去色块、去边框，只靠留白与细线分层，适合观点与长文。",
+  "id": "minimal-paper",
+  "name": "极简纸感",
+  "tagline": "无彩色块，靠留白和细横线分层，读起来像纸",
+  "best_for": ["观点随笔", "方法论", "行业观察", "长文分篇"],
+  "tokens": {
+    "primary": "#111111",
+    "primary_soft": "#fafafa",
+    "text": "#333333",
+    "text_strong": "#111111",
+    "muted": "#9a9a9a",
+    "border": "#ececec",
+    "card_bg": "#fafafa",
+    "code_bg": "#f5f5f5",
+    "code_text": "#2b2b2b",
+    "table_head_bg": "#ffffff",
+    "table_head_text": "#111111",
+    "font_size": "16px",
+    "line_height": "1.9",
+    "letter_spacing": "0.5px",
+    "radius": "0px",
+    "para_margin": "20px"
+  },
+  "writing": {
+    "tone": "平静、有判断。像写给同行看的长文，允许有观点和取舍，但不咄咄逼人。",
+    "opening": "从一个具体场景或一个反常识的观察切入，不解释背景，背景放到第二段。",
+    "heading": "只用最轻的小标题，或干脆不设小标题，靠空行与分隔线推进。",
+    "paragraph": "段落偏短，2-3 行。允许单句成段做停顿。",
+    "emoji": "禁用。",
+    "closing": "留一个开放的问题或一个判断，不总结全文。",
+    "avoid": ["小标题党", "彩色强调滥用", "每段都加粗重点", "营销式收尾"]
+  }
+}

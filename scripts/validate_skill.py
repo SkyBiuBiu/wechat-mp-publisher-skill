@@ -10,6 +10,7 @@
   4. 所有 Python 脚本能否通过语法编译
   5. 是否存在泄露的密钥（AppID / AppSecret 形态）
   6. SKILL.md 中引用的仓库内相对路径是否真实存在
+  7. 风格预设是否与文件名、token 字典、模板占位符三方一致
 
 退出码：0 = 全部通过，1 = 存在 FAIL。
 
@@ -18,7 +19,9 @@
     python scripts/validate_skill.py --quiet     # 只输出问题
 """
 
+import glob
 import io
+import json
 import os
 import re
 import sys
@@ -33,12 +36,23 @@ REQUIRED = [
     "VERSION",
     "CHANGELOG.md",
     "scripts/publish.py",
+    "scripts/preflight.py",
+    "scripts/apply_style.py",
     "scripts/watch_ip.py",
     "scripts/make_assets.py",
     "references/wechat-api-reference.md",
+    "references/style-presets.md",
     "assets/templates/article.html",
+    "assets/templates/article.template.html",
     "assets/templates/config.example.json",
 ]
+
+# ---- 风格预设：至少要有一条，且字段齐全 --------------------------------------
+STYLE_TOKEN_KEYS = {
+    "primary", "primary_soft", "text", "text_strong", "muted", "border",
+    "card_bg", "code_bg", "code_text", "table_head_bg", "table_head_text",
+    "font_size", "line_height", "letter_spacing", "radius", "para_margin",
+}
 
 # ---- 扫描时跳过的目录 --------------------------------------------------------
 SKIP_DIRS = {
@@ -243,6 +257,54 @@ def check_references():
         ok("SKILL.md 引用路径", "{} 处引用全部有效".format(len(refs)))
 
 
+# ---- 7. 风格预设 -------------------------------------------------------------
+def check_styles():
+    """预设要与文件名、token 字典、模板占位符三方对齐，否则渲染会报错或静默漏色。"""
+    sdir = os.path.join(ROOT, "assets", "styles")
+    if not os.path.isdir(sdir):
+        fail("风格预设", "assets/styles/ 目录不存在")
+        return
+    files = sorted(glob.glob(os.path.join(sdir, "*.json")))
+    if not files:
+        fail("风格预设", "assets/styles/ 下没有任何预设")
+        return
+
+    problems = []
+    for path in files:
+        name = os.path.splitext(os.path.basename(path))[0]
+        try:
+            data = json.loads(read(path))
+        except ValueError as e:
+            problems.append("{} 不是合法 JSON：{}".format(name, e))
+            continue
+        if data.get("id") != name:
+            problems.append("{} 的 id 字段是「{}」，与文件名不一致".format(
+                name, data.get("id")))
+        missing = sorted(STYLE_TOKEN_KEYS - set((data.get("tokens") or {}).keys()))
+        if missing:
+            problems.append("{} 缺 token：{}".format(name, "、".join(missing)))
+        if not (data.get("writing") or {}).get("tone"):
+            problems.append("{} 的 writing.tone 为空".format(name))
+
+    tpl = os.path.join(ROOT, "assets", "templates", "article.template.html")
+    if os.path.isfile(tpl):
+        body = re.sub(r"<!--.*?-->", "", read(tpl), flags=re.S)
+        ph = set(re.findall(r"\{\{\s*([A-Za-z_][A-Za-z0-9_]*)\s*\}\}", body))
+        unknown = sorted(ph - STYLE_TOKEN_KEYS)
+        unused = sorted(STYLE_TOKEN_KEYS - ph)
+        if unknown:
+            problems.append("模板用了未定义的占位符：" + "、".join(unknown))
+        if unused:
+            problems.append("token 没被模板用到：" + "、".join(unused))
+    else:
+        problems.append("缺少 assets/templates/article.template.html")
+
+    if problems:
+        fail("风格预设", "；".join(problems))
+    else:
+        ok("风格预设", "{} 条，与 token 字典、模板占位符三方一致".format(len(files)))
+
+
 # ---- main -------------------------------------------------------------------
 def main():
     quiet = "--quiet" in sys.argv or "-q" in sys.argv
@@ -253,7 +315,7 @@ def main():
     print("=" * 64)
 
     for fn in (check_required, check_frontmatter, check_version,
-               check_python_syntax, check_secrets, check_references):
+               check_python_syntax, check_secrets, check_references, check_styles):
         try:
             fn()
         except Exception as e:  # 自检器自身不应崩

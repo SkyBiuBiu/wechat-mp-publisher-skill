@@ -1,0 +1,34 @@
+{
+  "_说明": "风格预设：杂志暖调。暖米底 + 大引文块 + 圆角卡片，适合叙事性内容。",
+  "id": "magazine-warm",
+  "name": "杂志暖调",
+  "tagline": "暖色底、大引文、圆角卡片，有叙事感，不端着",
+  "best_for": ["项目复盘", "访谈对话", "团队故事", "年度总结"],
+  "tokens": {
+    "primary": "#b45309",
+    "primary_soft": "#fdf6ee",
+    "text": "#3a332c",
+    "text_strong": "#1f1a15",
+    "muted": "#9c8f80",
+    "border": "#f0e6da",
+    "card_bg": "#fdf8f3",
+    "code_bg": "#2b2622",
+    "code_text": "#f2ebe3",
+    "table_head_bg": "#3a332c",
+    "table_head_text": "#fdf8f3",
+    "font_size": "16px",
+    "line_height": "1.9",
+    "letter_spacing": "0.5px",
+    "radius": "8px",
+    "para_margin": "20px"
+  },
+  "writing": {
+    "tone": "有温度但不说教。用第一人称讲真实发生的事，承认过程中的犹豫和代价。",
+    "opening": "一个具体的时间点或场景细节，让读者先进现场，再交代这件事的背景。",
+    "heading": "允许带情绪的词，但不要夸张。小标题可以是一句话。",
+    "paragraph": "段落节奏要有变化，长短交替；关键判断可以单独成段。",
+    "emoji": "克制，最多在分段处用 1-2 个，不连续使用。",
+    "closing": "落到具体的人或具体的下一步，不写「共勉」「加油」。",
+    "avoid": ["虚构细节", "鸡汤式感悟", "把团队功劳全归于个人", "通篇形容词"]
+  }
+}

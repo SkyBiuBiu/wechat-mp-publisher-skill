@@ -11,7 +11,8 @@
 | `SKILL.md` | **必须在根目录**，frontmatter 需含 `name` / `description`，`name` 与目录名一致 |
 | `scripts/` | 可执行脚本。技能被调用时，AI 从这里找工具 |
 | `references/` | 供 AI 参考的文档，按需加载，不进主上下文 |
-| `assets/` | 模板与静态资源 |
+| `assets/styles/` | 风格预设（每路线一个 JSON）。**文件名必须等于内部的 `id` 字段**，token 要覆盖全部 16 个键 |
+| `assets/templates/` | 模板与配置样例。`article.template.html` 的 `{{}}` 占位符必须都在 token 字典内且全部用到 |
 | `docs/` | 面向人的文档，GitHub 展示用，AI 不读 |
 | `.github/` | CI 与协作模板 |
 
@@ -20,16 +21,22 @@
 1. **绝不提交密钥**。`config.json`、`.token_cache.json`、`.env` 已在 `.gitignore` 中。
    `config.example.json` 只允许占位值（`wx0000...` / 全 0）。
    提 PR 前跑 `python scripts/validate_skill.py`，它会扫一遍。
-2. **脚本保持零第三方依赖**（`publish.py` / `watch_ip.py` / `validate_skill.py` / `build_zip.py`）。
+2. **脚本保持零第三方依赖**（`publish.py` / `preflight.py` / `apply_style.py` /
+   `watch_ip.py` / `validate_skill.py` / `build_zip.py`）。
    只有 `make_assets.py` 允许依赖 `pillow`，且必须能优雅降级/给出安装提示。
    理由：技能会被直接投放到用户机器上跑，装依赖是最大的摩擦来源。
 3. **跨平台**。Windows 与 Linux 都要能跑：
    - 路径统一用 `os.path.join` / `pathlib`，别硬编码 `/` 或 `\`
-   - 控制台输出避免 ANSI 颜色（Windows 老终端不认）
+   - 控制台输出避免 ANSI 颜色（Windows 老终端不认）；需要输出中文/特殊符号时
+     对 `sys.stdout` 做 `reconfigure(encoding="utf-8", errors="replace")`
    - 文件读写显式 `encoding="utf-8"`
 4. **不破坏能力边界声明**。`SKILL.md` 第一节与 `references` 的权限矩阵是实测结论，
    修改必须附上真实环境验证记录，不能只改文字。
 5. **破坏性操作必须二次确认**。`publish` / `delete` 保留交互确认与 `-y` 逃生口。
+6. **新增体检规则要登记依据**。`preflight.py` 里新增一条检查，必须在
+   `references/wechat-api-reference.md` 第六节的表格里同步登记，并标明它属于
+   **官方硬约束 / 实测行为 / 经验阈值** 哪一类 —— 三类可信度不同，混在一起会误导使用者。
+   合规类词库尤其要注意：它是风险提示，不是违规判定，措辞不能写成结论。
 
 ## 开发流程
 
@@ -48,13 +55,17 @@ python scripts/build_zip.py
 
 ```bash
 mkdir -p /tmp/wx-e2e/assets && cd /tmp/wx-e2e
-cp /path/to/repo/assets/templates/article.html .
+python /path/to/repo/scripts/apply_style.py --preset engineering-orange -o article.html  # 先渲染正文
 cp /path/to/repo/assets/templates/config.example.json config.json
 # 填入自己的 appid / appsecret，然后
-python /path/to/repo/scripts/publish.py check
-python /path/to/repo/scripts/publish.py draft
+python /path/to/repo/scripts/preflight.py -c config.json    # 体检：不连网，先查内容
+python /path/to/repo/scripts/publish.py check               # 验凭证 + 白名单
+python /path/to/repo/scripts/publish.py draft               # 建草稿
 python /path/to/repo/scripts/publish.py delete --media-id <验证稿id> -y   # 用完删掉，别污染草稿箱
 ```
+
+`preflight.py` 与 `apply_style.py` 不需要凭证，也不联网，改完这两个脚本直接拿仓库里的
+`assets/templates/` 试跑就能验证，不用碰真实公众号。
 
 ## 版本与发布
 

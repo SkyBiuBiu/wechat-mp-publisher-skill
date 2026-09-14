@@ -10,6 +10,16 @@
 
   "author": "Sky",
 
+  "_style": "推文风格路线。preset 取 assets/styles/ 下的文件名（不带 .json）；overrides 只写要改的 token，其余继承预设。可用 python scripts/apply_style.py --list 查看全部",
+  "style": {
+    "preset": "engineering-orange",
+    "overrides": {
+      "_示例": "想微调时把下面几行解开，key 必须是 apply_style.py 认识的 token",
+      "_primary": "#1f4e8c",
+      "_font_size": "16px"
+    }
+  },
+
   "article": {
     "_title": "标题，硬上限 32 个字，超了微信直接报错",
     "title": "在这里填文章标题（上限 32 字）",
@@ -17,10 +27,10 @@
     "_digest": "摘要，硬上限 120 字。留空则自动抓正文前 54 字",
     "digest": "在这里填摘要（上限 120 字，留空会自动抓正文前 54 字）",
 
-    "_content_file": "正文 HTML 文件，路径相对本配置文件的目录。图片写本地相对路径即可，脚本会自动上传换链",
+    "_content_file": "正文 HTML 文件，路径相对本配置文件的目录。用 apply_style.py 渲染生成，图片写本地相对路径即可，脚本会自动上传换链",
     "content_file": "article.html",
 
-    "_cover_file": "封面图。必须传，且走永久素材接口，生成 media_id 填进 thumb_media_id",
+    "_cover_file": "封面图。必须传，且走永久素材接口，生成 media_id 填进 thumb_media_id。建议 900x383（2.35:1）",
     "cover_file": "assets/cover.png",
 
     "_content_source_url": "原文链接，即文末「阅读原文」跳转地址。留空则不显示",

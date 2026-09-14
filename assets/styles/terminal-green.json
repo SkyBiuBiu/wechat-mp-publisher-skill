@@ -1,0 +1,34 @@
+{
+  "_说明": "风格预设：终端绿。深色代码块是主视觉，等宽字体 + 编号步骤，适合源码与命令行教程。",
+  "id": "terminal-green",
+  "name": "终端绿",
+  "tagline": "深色代码块当主角，适合源码阅读与命令行实操",
+  "best_for": ["源码分析", "CLI 教程", "配置详解", "报错定位"],
+  "tokens": {
+    "primary": "#1f9d55",
+    "primary_soft": "#f2fbf5",
+    "text": "#2f3437",
+    "text_strong": "#16181d",
+    "muted": "#7c8590",
+    "border": "#e3e8ee",
+    "card_bg": "#f6f8fa",
+    "code_bg": "#0d1117",
+    "code_text": "#c9d1d9",
+    "table_head_bg": "#16181d",
+    "table_head_text": "#e8eaee",
+    "font_size": "15px",
+    "line_height": "1.75",
+    "letter_spacing": "0.3px",
+    "radius": "4px",
+    "para_margin": "16px"
+  },
+  "writing": {
+    "tone": "直给、可执行。每个结论后面必须能跟一条能跑的命令或一段能复制的配置。",
+    "opening": "先给环境前提（系统、版本、依赖），再给目标，两段之内说完。",
+    "heading": "动词开头，如「装依赖」「改配置」「验结果」，一个标题一件事。",
+    "paragraph": "解释性文字每段不超过 2-3 行，成段代码优先贴图或代码块，不夹在段落里。",
+    "emoji": "禁用。终端里能表达的不靠表情。",
+    "closing": "以验证命令和预期输出收尾，让读者能自查是否成功。",
+    "avoid": ["只讲原理不给命令", "命令不给参数说明", "省略报错处理", "贴大段无注释代码"]
+  }
+}
