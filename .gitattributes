@@ -1,0 +1,26 @@
+# 统一换行符，避免 Windows / Linux 协作时全文件 diff
+* text=auto eol=lf
+
+# 文本文件显式声明
+*.py        text eol=lf
+*.md        text eol=lf
+*.json      text eol=lf
+*.yml       text eol=lf
+*.yaml      text eol=lf
+*.html      text eol=lf
+*.txt       text eol=lf
+
+# PowerShell / 批处理保留 CRLF
+*.ps1       text eol=crlf
+*.bat       text eol=crlf
+
+# 二进制
+*.png       binary
+*.jpg       binary
+*.jpeg      binary
+*.gif       binary
+*.zip       binary
+
+# 语言统计时把 references 也算进来
+references/* linguist-documentation
+docs/*       linguist-documentation

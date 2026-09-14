@@ -1,0 +1,89 @@
+name: CI
+
+on:
+  push:
+    branches: [main, master]
+  pull_request:
+    branches: [main, master]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  # ---------------------------------------------------------------
+  # 仓库自检：结构、frontmatter、版本一致性、语法、密钥、引用路径
+  # ---------------------------------------------------------------
+  validate:
+    name: 自检 (Python ${{ matrix.python-version }})
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        python-version: ["3.9", "3.12"]
+    steps:
+      - name: 检出代码
+        uses: actions/checkout@v4
+
+      - name: 安装 Python ${{ matrix.python-version }}
+        uses: actions/setup-python@v5
+        with:
+          python-version: ${{ matrix.python-version }}
+
+      - name: 运行仓库自检
+        run: python scripts/validate_skill.py
+
+  # ---------------------------------------------------------------
+  # 独立密钥扫描：兜住 .gitignore 之外的疏漏（历史提交也算）
+  # ---------------------------------------------------------------
+  secret-scan:
+    name: 密钥扫描
+    runs-on: ubuntu-latest
+    steps:
+      - name: 检出完整历史
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: gitleaks
+        uses: gitleaks/gitleaks-action@v2
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+  # ---------------------------------------------------------------
+  # 打包链路验证：确保分发包始终可产出
+  # ---------------------------------------------------------------
+  package:
+    name: 打包校验
+    runs-on: ubuntu-latest
+    needs: validate
+    steps:
+      - name: 检出代码
+        uses: actions/checkout@v4
+
+      - name: 安装 Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: 生成分发包
+        run: python scripts/build_zip.py
+
+      - name: 确认包内不含密钥文件
+        run: |
+          set -e
+          ZIP=$(ls dist/*.zip | head -n1)
+          echo "检查 $ZIP"
+          if unzip -l "$ZIP" | grep -E 'config\.json|token_cache'; then
+            echo "::error::分发包中出现了密钥相关文件"
+            exit 1
+          fi
+          echo "OK：分发包干净"
+
+      - name: 上传产物
+        uses: actions/upload-artifact@v4
+        with:
+          name: wechat-mp-publisher-dist
+          path: dist/*.zip
+          if-no-files-found: error
+          retention-days: 14

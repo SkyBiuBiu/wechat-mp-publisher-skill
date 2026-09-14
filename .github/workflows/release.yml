@@ -1,0 +1,58 @@
+name: Release
+
+on:
+  push:
+    tags:
+      - "v*"
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  release:
+    name: 构建并发布
+    runs-on: ubuntu-latest
+    steps:
+      - name: 检出代码
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: 安装 Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: 发布前自检（必须全绿）
+        run: python scripts/validate_skill.py
+
+      - name: 读取版本号
+        id: ver
+        run: |
+          VERSION="$(cat VERSION)"
+          echo "version=$VERSION" >> "$GITHUB_OUTPUT"
+          echo "tag=${GITHUB_REF_NAME}" >> "$GITHUB_OUTPUT"
+          echo "版本：$VERSION / 标签：${GITHUB_REF_NAME}"
+
+      - name: 校验标签与 VERSION 一致
+        run: |
+          set -e
+          VERSION="$(cat VERSION)"
+          TAG="${GITHUB_REF_NAME#v}"
+          if [ "$VERSION" != "$TAG" ]; then
+            echo "::error::VERSION($VERSION) 与标签($TAG) 不一致，请同步后再发版"
+            exit 1
+          fi
+
+      - name: 生成分发包
+        run: python scripts/build_zip.py
+
+      - name: 创建 Release 并附加 zip
+        uses: softprops/action-gh-release@v2
+        with:
+          name: v${{ steps.ver.outputs.version }}
+          files: dist/*.zip
+          generate_release_notes: true
+          draft: false
+          prerelease: false
