@@ -9,15 +9,20 @@
     python make_assets.py -o /path/to/proj/assets          # 指定输出目录
     python make_assets.py --title "标题" --subtitle "副标题" --brand "署名"
 产出：
-    cover.png        900x383（公众号封面 2.35:1）
-    diagram.png      900x420（正文插图，链路示意）
+    cover.png        1800x766（公众号封面 2.35:1，2x 高清）
+    diagram.png      1800x840（正文插图，链路示意，2x 高清）
 
+2x 高清说明：公众号封面按 900px 宽展示、正文区约 677px 宽，
+2 倍超采样输出保证手机 2x/3x 屏上文字锐利不糊。
 改文案用命令行参数；要改版式直接改下面的 make_cover / make_flow。
 """
 import argparse
 import os
 import sys
 from PIL import Image, ImageDraw, ImageFont
+
+# 2x 高清倍率：全部坐标与字号按此缩放（设计稿以 1x 为单位）
+S = 2
 
 ORANGE = (217, 79, 34)
 BG = (22, 24, 29)
@@ -30,6 +35,7 @@ DIM = (108, 114, 126)
 
 def font(size, bold=False):
     """挑一个可用的中文字体，按优先级回退。"""
+    size = int(size * S)
     candidates = []
     if bold:
         candidates += [r"C:\Windows\Fonts\msyhbd.ttc", r"C:\Windows\Fonts\msyh.ttc",
@@ -50,24 +56,24 @@ def font(size, bold=False):
 
 
 def make_cover(out_dir, brand, title, subtitle, date_str):
-    W, H = 900, 383
+    W, H = 900 * S, 383 * S
     img = Image.new("RGB", (W, H), BG)
     d = ImageDraw.Draw(img)
 
-    d.rectangle([0, 0, 7, H], fill=ORANGE)
-    d.text((56, 48), brand, font=font(19), fill=ORANGE)
+    d.rectangle([0, 0, 7 * S, H], fill=ORANGE)
+    d.text((56 * S, 48 * S), brand, font=font(19), fill=ORANGE)
 
     # 标题超长自动折成两行
     if len(title) > 9:
         cut = (len(title) + 1) // 2
-        d.text((56, 96), title[:cut], font=font(50, True), fill=FG)
-        d.text((56, 160), title[cut:], font=font(50, True), fill=FG)
+        d.text((56 * S, 96 * S), title[:cut], font=font(50, True), fill=FG)
+        d.text((56 * S, 160 * S), title[cut:], font=font(50, True), fill=FG)
     else:
-        d.text((56, 126), title, font=font(56, True), fill=FG)
+        d.text((56 * S, 126 * S), title, font=font(56, True), fill=FG)
 
-    d.line([(57, 236), (151, 236)], fill=ORANGE, width=2)
-    d.text((56, 256), subtitle, font=font(21), fill=MUTED)
-    d.text((56, 306), date_str, font=font(17), fill=DIM)
+    d.line([(57 * S, 236 * S), (151 * S, 236 * S)], fill=ORANGE, width=2 * S)
+    d.text((56 * S, 256 * S), subtitle, font=font(21), fill=MUTED)
+    d.text((56 * S, 306 * S), date_str, font=font(17), fill=DIM)
 
     path = os.path.join(out_dir, "cover.png")
     img.save(path)
@@ -75,15 +81,15 @@ def make_cover(out_dir, brand, title, subtitle, date_str):
 
 
 def make_flow(out_dir):
-    W, H = 900, 420
+    W, H = 900 * S, 420 * S
     img = Image.new("RGB", (W, H), BG)
     d = ImageDraw.Draw(img)
 
-    d.text((44, 36), "发布链路三步", font=font(25, True), fill=FG)
-    d.text((44, 74), "任一环节失败，草稿箱里都不会出现文章", font=font(17), fill=MUTED)
+    d.text((44 * S, 36 * S), "发布链路三步", font=font(25, True), fill=FG)
+    d.text((44 * S, 74 * S), "任一环节失败，草稿箱里都不会出现文章", font=font(17), fill=MUTED)
 
-    bw, bh, gap = 240, 148, 44
-    x0, y0 = 44, 132
+    bw, bh, gap = 240 * S, 148 * S, 44 * S
+    x0, y0 = 44 * S, 132 * S
     steps = [
         ("01", "access_token", "/cgi-bin/token", "验 AppID / AppSecret\n+ IP 白名单"),
         ("02", "素材上传", "uploadimg / add_material", "正文图换链\n封面拿 media_id"),
@@ -92,23 +98,25 @@ def make_flow(out_dir):
 
     for i, (num, title, api, desc) in enumerate(steps):
         x = x0 + i * (bw + gap)
-        d.rounded_rectangle([x, y0, x + bw, y0 + bh], radius=10,
-                            fill=PANEL, outline=BORDER, width=1)
-        d.rounded_rectangle([x, y0, x + 3, y0 + bh], radius=2, fill=ORANGE)
-        d.text((x + 20, y0 + 16), num, font=font(15, True), fill=ORANGE)
-        d.text((x + 20, y0 + 44), title, font=font(21, True), fill=FG)
-        d.text((x + 20, y0 + 78), api, font=font(13), fill=DIM)
-        d.multiline_text((x + 20, y0 + 102), desc, font=font(15), fill=MUTED, spacing=6)
+        d.rounded_rectangle([x, y0, x + bw, y0 + bh], radius=10 * S,
+                            fill=PANEL, outline=BORDER, width=1 * S)
+        d.rounded_rectangle([x, y0, x + 3 * S, y0 + bh], radius=2 * S, fill=ORANGE)
+        d.text((x + 20 * S, y0 + 16 * S), num, font=font(15, True), fill=ORANGE)
+        d.text((x + 20 * S, y0 + 44 * S), title, font=font(21, True), fill=FG)
+        d.text((x + 20 * S, y0 + 78 * S), api, font=font(13), fill=DIM)
+        d.multiline_text((x + 20 * S, y0 + 102 * S), desc, font=font(15),
+                         fill=MUTED, spacing=6 * S)
 
         if i < len(steps) - 1:
-            ax = x + bw + 8
+            ax = x + bw + 8 * S
             ay = y0 + bh // 2
-            d.line([(ax, ay), (ax + gap - 18, ay)], fill=BORDER, width=2)
-            d.polygon([(ax + gap - 18, ay - 5), (ax + gap - 8, ay), (ax + gap - 18, ay + 5)],
+            d.line([(ax, ay), (ax + gap - 18 * S, ay)], fill=BORDER, width=2 * S)
+            d.polygon([(ax + gap - 18 * S, ay - 5 * S), (ax + gap - 8 * S, ay),
+                       (ax + gap - 18 * S, ay + 5 * S)],
                       fill=ORANGE)
 
-    d.text((44, 330), "共同前提：账号类型与认证状态决定接口权限", font=font(16), fill=DIM)
-    d.text((44, 358), "未认证账号调用发布接口会返回 48001 api unauthorized",
+    d.text((44 * S, 330 * S), "共同前提：账号类型与认证状态决定接口权限", font=font(16), fill=DIM)
+    d.text((44 * S, 358 * S), "未认证账号调用发布接口会返回 48001 api unauthorized",
            font=font(16), fill=DIM)
 
     path = os.path.join(out_dir, "diagram.png")

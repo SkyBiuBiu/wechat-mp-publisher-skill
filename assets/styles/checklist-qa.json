@@ -1,5 +1,5 @@
 {
-  "_说明": "风格预设：清单问答。Q/A 块 + 勾选清单 + 步骤条，适合 FAQ、SOP、避坑指南。",
+  "_说明": "风格预设：清单问答（v0.3.3 优化版）。青绿主色 + 浅青卡片，表头青绿；代码块深石板底配青绿 keyword，小标题独立字号，扫读友好的『FAQ/SOP』形态。",
   "id": "checklist-qa",
   "name": "清单问答",
   "tagline": "问一句答一句，配勾选清单和步骤条，扫读友好",
@@ -9,18 +9,27 @@
     "primary_soft": "#f0fdfa",
     "text": "#374151",
     "text_strong": "#111827",
-    "muted": "#8896a5",
+    "muted": "#64748b",
     "border": "#e5e7eb",
-    "card_bg": "#f9fafb",
+    "card_bg": "#f8fafc",
     "code_bg": "#111827",
     "code_text": "#e5e7eb",
     "table_head_bg": "#0f766e",
     "table_head_text": "#ffffff",
     "font_size": "15px",
+    "heading_size": "17px",
     "line_height": "1.8",
-    "letter_spacing": "0.4px",
+    "letter_spacing": "0.3px",
     "radius": "6px",
     "para_margin": "16px"
+  },
+  "code_highlight": {
+    "keyword": "#5eead4",
+    "string": "#a5d6ff",
+    "comment": "#8b949e",
+    "number": "#79c0ff",
+    "function": "#d2a8ff",
+    "variable": "#ffa657"
   },
   "writing": {
     "tone": "干脆，一问一答，不绕。像在回同事的即时消息。",

@@ -53,6 +53,7 @@ STYLE_TOKEN_KEYS = {
     "primary", "primary_soft", "text", "text_strong", "muted", "border",
     "card_bg", "code_bg", "code_text", "table_head_bg", "table_head_text",
     "font_size", "line_height", "letter_spacing", "radius", "para_margin",
+    "heading_size",
 }
 
 # ---- 扫描时跳过的目录 --------------------------------------------------------

@@ -43,7 +43,8 @@ COLOR_KEYS = [
     "primary", "primary_soft", "text", "text_strong", "muted", "border",
     "card_bg", "code_bg", "code_text", "table_head_bg", "table_head_text",
 ]
-SIZE_KEYS = ["font_size", "line_height", "radius", "para_margin", "letter_spacing"]
+SIZE_KEYS = ["font_size", "line_height", "radius", "para_margin", "letter_spacing",
+             "heading_size"]
 TOKEN_KEYS = COLOR_KEYS + SIZE_KEYS
 
 COLOR_RE = re.compile(r"^#(?:[0-9a-fA-F]{3}|[0-9a-fA-F]{6})$")
@@ -57,7 +58,7 @@ LABEL = {
     "card_bg": "卡片底", "code_bg": "代码块底", "code_text": "代码文字",
     "table_head_bg": "表头底", "table_head_text": "表头文字",
     "font_size": "正文字号", "line_height": "行高", "radius": "圆角",
-    "para_margin": "段间距", "letter_spacing": "字间距",
+    "para_margin": "段间距", "letter_spacing": "字间距", "heading_size": "小标题字号",
 }
 
 

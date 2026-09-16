@@ -369,33 +369,35 @@ def mark_indent(code):
 
 # ================================================================ 卡片生成
 def build_code_section(lang, label, code, st, opts):
+    """生成代码卡片。
+
+    结构刻意保持「编辑器抗清洗」：
+    - 不用 display:flex / rgba() / white-space:pre-wrap / overflow:hidden ——
+      公众号编辑器（mp 后台打开草稿并保存时）会重新序列化正文，
+      这些属性会被剥掉，导致深色卡片变回白底纯文本。
+    - 背景直接写在单个 <section> 上（background 简写），
+      语言徽标 + 「长按复制」合并为单行，不依赖 flex 并排。
+    - 代码行用 <br> + &nbsp; 保换行与缩进，word-break:break-all 兜底长行折行。
+    """
     toks = st["tokens"]
     body = highlight(mark_indent(code), lang, st["colors"],
                      opts.get("highlight", True))
     head = ""
     if label or opts.get("copy_hint", True):
         left = esc(label) if label else (lang.upper() if lang else "CODE")
+        hint = " · 长按复制" if opts.get("copy_hint", True) else ""
         head = (
-            '<section style="padding:7px 14px;'
-            "border-bottom:1px solid {hl};"
-            'display:flex;justify-content:space-between;align-items:center;">'
-            '<p style="margin:0;font-family:Consolas,Menlo,monospace;'
-            "font-size:12px;line-height:1.5;color:{badge};"
-            'letter-spacing:0.5px;">{left}</p>{right}</section>'
-        ).format(
-            hl="rgba(255,255,255,0.14)" if st["dark"] else "rgba(0,0,0,0.08)",
-            badge=toks["primary"], left=left,
-            right=('<p style="margin:0;font-size:12px;line-height:1.5;'
-                   'color:{m};">长按复制</p>'.format(m=toks["muted"]))
-            if opts.get("copy_hint", True) else "")
+            '<p style="margin:0 0 6px;font-family:Consolas,Menlo,monospace;'
+            "font-size:12px;line-height:1.5;color:{badge};\">"
+            "{left}{hint}</p>"
+        ).format(badge=toks["primary"], left=left, hint=hint)
     return (
         '<section style="margin:0 0 {pm};background:{bg};'
-        'border-radius:{r};overflow:hidden;">{head}'
-        '<section style="padding:12px 14px 13px;">'
-        '<p style="margin:0;font-family:Consolas,Menlo,Monaco,'
-        "&#39;Courier New&#39;,monospace;font-size:13px;line-height:1.7;"
-        "color:{ct};white-space:pre-wrap;word-break:break-all;\">{body}"
-        "</p></section></section>"
+        'border-radius:{r};padding:12px 14px;">{head}'
+        '<p style="margin:0;font-family:Consolas,Menlo,monospace;'
+        "font-size:13px;line-height:1.7;color:{ct};"
+        'word-break:break-all;">{body}'
+        "</p></section>"
     ).format(pm=toks["para_margin"], bg=toks["code_bg"], r=toks["radius"],
              head=head, ct=toks["code_text"], body=body)
 
@@ -464,7 +466,10 @@ def render_mermaid(src, idx, out_dir, st, mcfg):
                              "htmlLabels": False}}
         raw = json.dumps(state, ensure_ascii=False).encode("utf-8")
         b64 = base64.urlsafe_b64encode(raw).decode("ascii").rstrip("=")
-        url = "https://mermaid.ink/img/{}?type=png".format(b64)
+        # scale/width 决定输出像素分辨率：mermaid.ink 默认图偏小，
+        # 手机上按 100% 宽显示会被放大变糊，这里显式放大渲染
+        url = "https://mermaid.ink/img/{}?type=png&scale={}&width={}".format(
+            b64, scale, width)
         req = urllib.request.Request(url, headers={
             "User-Agent": "wechat-mp-publisher/0.3"})
         try:

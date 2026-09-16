@@ -275,9 +275,15 @@ def check_cover(cfg, base_dir, findings, stats):
             add(findings, P1, "WX115", "封面比例偏离 2.35:1",
                 "当前 {}x{}（{:.2f}:1），公众号首图按 2.35:1 展示".format(w, h, ratio),
                 "重做成 900x383 最稳，或在 config 里用 cover_info.crop_percent_list 指定裁剪")
-        if w < 600:
-            add(findings, P2, "WX212", "封面分辨率偏低",
-                "宽 {}px".format(w), "封面建议 900x383（宽不小于 600px），小图会被拉糊")
+        if w < 1200:
+            add(findings, P1, "WX116", "封面分辨率偏低，会糊",
+                "宽 {}px".format(w),
+                "公众号封面按 900px 宽展示，2x 屏需 1800px；低于 1200px 放大显示会糊，"
+                "用 make_assets.py 重新生成（1800x766）或换高清图")
+        elif w < 1800:
+            add(findings, P2, "WX212", "封面分辨率未达 2x 高清",
+                "宽 {}px".format(w),
+                "建议 1800x766 以上（900px 展示 ×2），大屏和朋友圈列表更锐利")
 
 
 def check_content(cfg, base_dir, findings, stats):
@@ -425,13 +431,21 @@ def check_images(content, base_dir, findings, stats):
                 "{} 有 {:.2f} MB".format(src, size / 1048576.0),
                 "压缩到 1MB 以下；截图建议 deviceScaleFactor 设 2 就够")
         wh = img_size(p)
-        if wh and wh[0] > 2000:
-            oversized.append("{}（{}x{}）".format(src, wh[0], wh[1]))
+        if wh:
+            if wh[0] < 750:
+                add(findings, P1, "WX218", "正文图片分辨率偏低，会糊",
+                    "{}（{}x{}）".format(src, wh[0], wh[1]),
+                    "正文区宽约 677px，2x 屏需要约 1354px；低于 750px 放大显示会糊，"
+                    "换高清图或提高导出分辨率")
+            if wh[0] > 2400 and size > 500 * 1024:
+                oversized.append("{}（{}x{}，{:.0f}KB）".format(
+                    src, wh[0], wh[1], size / 1024.0))
 
     if oversized:
         add(findings, P2, "WX213", "正文图分辨率过大",
             "、".join(oversized[:3]),
-            "正文区宽约 677px，图片宽 1080-1500px 足够，过宽只会白占体积")
+            "正文区宽约 677px，图片宽 1080-1500px 足够；"
+            "超过 2400px 且体积明显偏大只会白占体积，可压缩导出")
 
     if stats["images"] > 20:
         add(findings, P2, "WX205", "正文图片较多",

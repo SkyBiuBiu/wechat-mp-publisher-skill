@@ -94,6 +94,11 @@ python <skill>/scripts/apply_style.py --style-file my-style.json -o article.html
 | 外链图 | **不允许**，会被静默过滤 | 不报错，图直接没了 |
 | `<style>` / `class` / JS | 会被剥离 | 不报错，样式全丢 |
 
+> **图片清晰度体检**（发布前自动查）：封面宽度 <1200px 报 P1（会糊）、
+> <1800px 报 P2（未达 2x 高清，建议 1800×766）；正文图片宽度 <750px 报 P1（会糊，
+> 正文区约 677px 宽、2x 屏需约 1354px）。`make_assets.py` 生成的就是 2x 高清版，
+> mermaid 渲染默认 scale=3 保证手机上锐利。
+
 > **正文字符数按 HTML 长度算，不是纯文本字数**。这是最容易误判的一条：代码块多、标签多的文章，纯文本才 4000 字也可能撞上 2 万字符上限。突破手段：mermaid 渲染成 PNG、代码块交给 enhance_content.py 重建（见第四步），仍超就拆篇（见第十节）。
 
 ## 五、工作流程

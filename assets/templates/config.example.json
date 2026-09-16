@@ -29,8 +29,8 @@
   "_mermaid": "mermaid 图渲染为 PNG（公众号剥 JS 与 SVG 文字）。remote=true 且本地没装 mmdc 时走 mermaid.ink 在线渲染，图表内容会发给该第三方服务；涉密内容请本地安装 mmdc（npm i -g @mermaid-js/mermaid-cli）并设 remote=false",
   "mermaid": {
     "remote": true,
-    "scale": 2,
-    "width": 800,
+    "scale": 3,
+    "width": 1200,
     "dir": "assets"
   },
 
