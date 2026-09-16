@@ -2,33 +2,47 @@
 
 # wechat-mp-publisher
 
-**微信公众号图文发布工具 —— WorkBuddy 技能 / 独立 CLI**
+**微信公众号图文发布工具 —— 技能 / 独立 CLI**
 
 用微信官方 API 把一篇带图带排版的图文推进草稿箱。<br>
 排版、配图、上传、成稿全自动，你只剩最后点一下「发表」。<br>
-风格有六条预设路线可选，发布前自动过一遍平台约束体检。
+六条风格预设路线可选，发布前自动过 53 项平台约束体检。
 
 [![CI](https://github.com/SkyBiuBiu/wechat-mp-publisher/actions/workflows/ci.yml/badge.svg)](https://github.com/SkyBiuBiu/wechat-mp-publisher/actions/workflows/ci.yml)
 [![License: MIT](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
-[![Version](https://img.shields.io/badge/version-0.2.0-orange.svg)](CHANGELOG.md)
+[![Version](https://img.shields.io/github/v/tag/SkyBiuBiu/wechat-mp-publisher)](CHANGELOG.md)
 [![Python](https://img.shields.io/badge/python-3.9%2B-3776AB.svg)](https://www.python.org/)
 
 </div>
 
 ---
 
-## 先说清楚能力边界
+## 一眼速览（人 / AI 共用）
 
-微信接口权限由**账号类型 + 认证状态**决定。这不是配置问题，是硬约束：
+| 项 | 值 |
+|---|---|
+| 是什么 | 把 HTML 正文 + 封面排版成公众号图文，推进草稿箱（可选正式发布） |
+| 最新版本 | `v0.3.5`（见 [CHANGELOG.md](CHANGELOG.md)） |
+| 语言 / 依赖 | Python 3.9+，**零第三方依赖**（Windows / Linux 通用） |
+| 触发场景 | 「发公众号」「推到草稿箱」「公众号排版发布」等图文发布需求 |
+| 个人号上限 | 建草稿 ✅ → 后台手动点「发表」；API 发布 ❌（微信硬限制，见下） |
+| 认证服务号 | 全链路可用，一条命令推送给粉丝 |
+| 发布前体检 | 53 条规则分 P0 阻断 / P1 警告 / P2 建议三级，每项给处理办法 |
+
+> **给 AI agent 的显式指引**：使用本技能前**必须**先读 [`SKILL.md`](SKILL.md)（入口文档，含完整工作流与约束），
+> 再按需读 `references/` 两份参考；不要凭本 README 的摘要直接调用脚本。
+> 通用排障与后台操作见 [`docs/manual.md`](docs/manual.md)。
+
+## 能力边界（先判断可行性，再动手）
+
+微信接口权限由**账号类型 + 认证状态**决定，这是硬约束：
 
 | 能力 | 可用范围 |
 |---|---|
 | 拿凭证 / 传正文图 / 传封面素材 / **建草稿** | ✅ 绝大多数账号可用。已在个人未认证订阅号上实测通过 |
 | **API 正式发布**（`freepublish/submit`） | ❌ 仅认证账号。**个人主体无法做微信认证 → 永久不可用** |
 
-**所以个人号的上限是**：脚本把图文做好、配好图、传好素材、丢进草稿箱，最后一步到后台手动点「发表」。省掉的是排版和上传，剩下的是那一下点击。
-
-认证服务号则全链路可用，可以一条命令直接推送给粉丝。
+**个人号的上限**：脚本把图文做好、配好图、传好素材、丢进草稿箱，最后一步到后台手动点「发表」。省掉的是排版和上传，剩下的是那一下点击。
 
 > 详细权限矩阵、实测记录与官方文档口径的差异，见 [`references/wechat-api-reference.md`](references/wechat-api-reference.md)。
 
@@ -36,11 +50,16 @@
 
 - **六条风格路线** —— `工程橙 / 极简纸感 / 终端绿 / 杂志暖调 / 商务蓝 / 清单问答`，
   视觉（配色、字号、卡片样式）与写作（语气、开篇、段落、emoji）两层都由预设定义；
-  16 个 token 可逐个覆盖，也能导出一份改。见 [`references/style-presets.md`](references/style-presets.md)
+  **17 个 token** 可逐个覆盖，也能导出一份改。见 [`references/style-presets.md`](references/style-presets.md)
 - **发布前约束体检** —— `preflight.py` 在本地把会翻车的地方拦掉：标题 32 字、作者 16 字、
   摘要 120 字、正文 2 万字符 / 1MB、图片体积与格式、外链图、会被剥离的 HTML 写法、
   排版问题、广告法与导流风险词。分 **P0 阻断 / P1 警告 / P2 建议** 三级，每项给处理办法
-- **mermaid + 代码块增强** —— `enhance_content.py` 把 ```mermaid 围栏渲染成 PNG（本地 mmdc 优先、mermaid.ink 远程兜底），代码围栏重建为内联样式高亮卡片：**不转图片、手机长按可复制**
+- **图片高清门槛** —— 发布前自动查清晰度：封面宽 <1200px 报 P1（会糊）、<1800px 提示 2x 高清；
+  正文图片宽 <750px 报 P1。`make_assets.py` 生成的封面/配图就是 2x 高清版
+- **mermaid 高清渲染** —— ```mermaid 围栏渲染成 PNG（本地 mmdc 优先、mermaid.ink 远程兜底），
+  默认 `scale=3 / width=1200`（约 3600px 宽输出），手机端放大不糊
+- **代码块可复制** —— 代码围栏重建为内联样式高亮卡片：**不转图片、手机长按可复制**，
+  并做「编辑器抗清洗」处理（单层 section 内联样式，后台保存不丢样式）
 - **零第三方依赖** —— 所有脚本只用 Python 标准库，Windows / Linux 通用，拷过去就能跑
 - **正文图片自动换链** —— 正文里写 `<img src="assets/xx.png">` 本地相对路径，脚本先传微信图床再替换 `src`（外链图会被微信静默过滤）
 - **错误码中文翻译** —— 微信的 `errcode` 直接翻成人话和处置建议；`40164` 还会自动从 `errmsg` 里抠出被拒的 IP
@@ -50,7 +69,7 @@
 
 ## 安装
 
-### 作为 WorkBuddy 技能（推荐）
+### 作为技能（推荐）
 
 技能就是仓库本身，clone 到技能目录即完成安装：
 
@@ -72,7 +91,7 @@ git clone https://github.com/SkyBiuBiu/wechat-mp-publisher.git `
 
 ### 作为独立命令行工具
 
-不需要 WorkBuddy，clone 到任意位置直接用：
+不需要技能宿主，clone 到任意位置直接用：
 
 ```bash
 git clone https://github.com/SkyBiuBiu/wechat-mp-publisher.git
@@ -95,7 +114,7 @@ cp assets/templates/config.example.json work/config.json
 # 2. 定风格，渲染出正文骨架
 python scripts/apply_style.py --list                                    # 看六条路线
 python scripts/apply_style.py --preset engineering-orange -o work/article.html
-#    然后把 work/article.html 改成自己的内容
+#    然后把 work/article.html 改成自己的内容（mermaid 写 ```mermaid 围栏、代码写 ``` 围栏即可）
 
 # 3. 体检：不连微信、不需要凭证，先查一遍字数/图片/排版/合规
 python scripts/preflight.py -c work/config.json
@@ -103,7 +122,7 @@ python scripts/preflight.py -c work/config.json
 # 4. 自检：验证凭证与 IP 白名单，不产生任何内容
 python scripts/publish.py check -c work/config.json
 
-# 5. 建草稿：图文进草稿箱，粉丝看不到（会先自动跑一次体检）
+# 5. 建草稿：图文进草稿箱，粉丝看不到（会先自动跑增强 + 体检）
 python scripts/publish.py draft -c work/config.json
 
 # 6. 去 mp.weixin.qq.com → 内容与互动 → 草稿箱，人工确认后点「发表」
@@ -150,14 +169,14 @@ P1 · 警告 · 2 项          ← 发得出去，但排版会塌 / 图会丢 / 
 P2 · 建议 · 3 项          ← 不影响发布，改了更好
 
 统计：P0×1  P1×2  P2×3
-      正文 19056 字符 [###########################-] 19056/20000 | 图片 4 张 | 封面 900x383
+      正文 19056 字符 [###########################-] 19056/20000 | 图片 4 张 | 封面 1800x766
 结果：不可发布 —— 先修 P0。
 ```
 
 有 P0 时退出码为 1，`draft` 会就地停下（此时还没发任何请求）。
 `--warn-only` 只报告不拦截，`--json` 给 CI 消费，`--no-compliance` 跳过合规词扫描。
 
-51 条检查项的判定依据（**官方硬约束 / 实测行为 / 经验阈值**）见
+**53 条检查项的判定依据**（官方硬约束 / 实测行为 / 经验阈值 三类）见
 [`references/wechat-api-reference.md`](references/wechat-api-reference.md) 第六节。
 
 ## 命令参考
@@ -199,7 +218,7 @@ python scripts/publish.py <子命令> [参数]
 | `scripts/preflight.py` | 发布前体检：P0/P1/P2 三级清单，`--json` / `--warn-only` / `--no-compliance` |
 | `scripts/enhance_content.py` | 内容增强：mermaid → PNG（mmdc / mermaid.ink），代码块 → 高亮卡片，`mermaid`/`code` 子命令、`--dry-run` |
 | `scripts/watch_ip.py` | 轮询等白名单生效，通了自动建草稿。`-i 秒` 调间隔，`-m 次数` 限次，`--no-preflight` 透传 |
-| `scripts/make_assets.py` | 生成封面（900×383）和正文插图，需 `pillow`，`--title/--subtitle/--date` 可配 |
+| `scripts/make_assets.py` | 生成 2x 高清封面（1800×766）和正文插图，需 `pillow`，`--title/--subtitle/--date` 可配 |
 | `scripts/validate_skill.py` | 仓库自检：结构 / frontmatter / 版本 / 语法 / 密钥 / 引用 / 预设一致性 |
 | `scripts/build_zip.py` | 打分发 zip 到 `dist/`，自动排除密钥与本机状态 |
 
@@ -214,21 +233,42 @@ python scripts/publish.py <子命令> [参数]
 | `author` | | 作者，上限 16 字 |
 | `style.preset` | | 风格路线 id，不填用 `engineering-orange` |
 | `style.overrides` | | 只写要改的 token，如 `{"primary": "#1f4e8c"}`，其余继承预设 |
+| `mermaid.remote` | | mermaid 渲染走 mermaid.ink 在线服务（默认 `true`）；涉密图表装 mmdc 后设 `false` |
+| `mermaid.scale` | | 渲染倍率，默认 `3`（与 width 共同决定输出像素，越高越清晰） |
+| `mermaid.width` | | 渲染基准宽度，默认 `1200`（输出宽 ≈ scale × width） |
+| `mermaid.dir` | | 渲染产物目录，默认 `assets` |
 | `article.title` | ✅ | 标题，上限 32 字 |
 | `article.digest` | | 摘要，上限 120 字；留空自动抓正文前 54 字 |
 | `article.content_file` | ✅ | 正文 HTML，路径相对配置文件所在目录 |
-| `article.cover_file` | ✅ | 封面图，走永久素材接口，建议 900×383 |
+| `article.cover_file` | ✅ | 封面图，走永久素材接口，建议 1800×766（2x 高清，2.35:1） |
 | `article.content_source_url` | | 文末「阅读原文」跳转地址，留空不显示 |
 | `need_open_comment` | | `1` 开评论 |
 | `only_fans_can_comment` | | `1` 仅粉丝可评 |
 
 凭证也可以用环境变量提供，不写配置文件：`WECHAT_MP_APPID` / `WECHAT_MP_APPSECRET`。
 
+## 给 AI agent 的使用指引
+
+本仓库既是人用的工具，也是可被 agent 调用的技能。如果你是 AI/自动化代理，请遵守：
+
+1. **入口必读**：先读 [`SKILL.md`](SKILL.md) 再动手——它定义了完整工作流（定风格 → 渲染 → 增强 → 体检 → 建草稿 → 发布）与全部硬约束，本 README 只是概览。
+2. **触发词**：用户提到「发公众号 / 推到草稿箱 / 公众号排版 / 公众号文章」等图文发布意图时使用；纯咨询（「公众号怎么认证」）不需要调用。
+3. **调用顺序**：改完代码先 `python scripts/validate_skill.py`；发布前先 `publish.py check` 验凭证，再 `draft`。
+4. **凭证处理**：`appid/appsecret` 写入 `config.json` 或环境变量；**不要**把密钥写进正文、日志或 commit；发现明文泄露要提醒用户重置。
+5. **常见陷阱（务必避开）**：
+   - 正文长度按 **HTML 字符数**计，不是纯文本字数；代码块多时优先 `enhance_content.py` 压降
+   - 代码块**不要转成图片**（会失去可复制性）；mermaid 才转 PNG
+   - 正文图片只用**本地相对路径**，外链图会被微信静默过滤
+   - 草稿建好后**不要在 mp 后台编辑器里点保存**（会清洗内联样式）；要改内容就重新建稿
+   - `40001` = token 被并发刷新失效，先 `publish.py token -f`
+   - 个人号 `48001` = 账号类型限制，重试无意义，转后台手动发布
+6. **交付**：把草稿 `media_id`、正文长度、图片清单、体检结论一起汇报；提醒用户最后一步手动「发表」。
+
 ## 目录结构
 
 ```
 wechat-mp-publisher/
-├── SKILL.md                        # WorkBuddy 技能入口（触发条件、风格、工作流、排障）
+├── SKILL.md                        # 技能入口（触发条件、风格、工作流、排障）
 ├── README.md                       # 本文件
 ├── docs/manual.md                  # 完整操作手册：后台路径、白名单排查、报错表
 ├── CHANGELOG.md                    # 版本变更记录
@@ -237,11 +277,11 @@ wechat-mp-publisher/
 ├── VERSION                         # 当前版本号
 ├── scripts/
 │   ├── publish.py                  # 主脚本（零依赖）
-│   ├── preflight.py                # 发布前体检：约束 / 排版 / 合规
-│   ├── enhance_content.py          # 内容增强：mermaid 渲染 + 代码块重建
+│   ├── preflight.py                # 发布前体检：约束 / 排版 / 合规 / 图片清晰度
+│   ├── enhance_content.py          # 内容增强：mermaid 高清渲染 + 代码块重建
 │   ├── apply_style.py              # 风格渲染：预设 token → 正文骨架
 │   ├── watch_ip.py                 # 白名单生效轮询
-│   ├── make_assets.py              # 封面 / 配图生成（需 pillow）
+│   ├── make_assets.py              # 2x 高清封面 / 配图生成（需 pillow）
 │   ├── validate_skill.py           # 仓库自检
 │   └── build_zip.py                # 分发包打包
 ├── references/
@@ -272,9 +312,12 @@ wechat-mp-publisher/
 
 **正文图片不显示** —— 用了外链图。改成 `<img src="assets/xx.png">` 的本地相对路径，脚本会自动换链。
 
-**提示正文超过 2 万字符** —— 注意**按 HTML 长度算，不是纯文本字数**。代码块多、标签多的文章，纯文本 4000 字也可能撞上限。最有效的压降手段是把代码块和图表截图成 PNG（单块从数千字符压到百余字符），或按章节拆成系列。详见 `SKILL.md` 第十节。
+**图片在手机上发糊** —— 图本身分辨率不足。正文图建议 ≥1354px 宽（正文区约 677px ×2 屏），封面建议 1800×766；
+`preflight` 会以 WX116 / WX218 拦掉低于门槛的图。mermaid 图默认 `scale=3` 渲染，一般不会糊。
 
-**体检报 WX012 说图片不存在** —— 模板 `article.template.html` 第 8 块引用了示例图 `assets/diagram.png`。放上自己的图，或把那一块整段删掉。
+**提示正文超过 2 万字符** —— 注意**按 HTML 长度算，不是纯文本字数**。代码块多、标签多的文章，纯文本 4000 字也可能撞上限。最有效的压降手段是让 `enhance_content.py` 把代码块重建为高亮卡片、mermaid 渲染成 PNG（单块从数千字符压到百余字符），或按章节拆成系列。详见 `SKILL.md` 第十节。
+
+**体检报 WX012 说图片不存在** —— 模板 `article.template.html` 引用了示例图 `assets/diagram.png`。放上自己的图，或把那一块整段删掉。
 
 **体检的合规词提示是不是判我违规** —— 不是。`WX114` 是风险提示，只说明这句话需要人工过一眼（「唯一标识」这类技术术语会被误报）。它不替代人工审核，用 `--no-compliance` 可以整体跳过。
 
@@ -301,8 +344,8 @@ python scripts/validate_skill.py
 python scripts/build_zip.py
 
 # 发版：改 VERSION 与 CHANGELOG → 打 tag → 推
-git commit -am "chore(release): v0.2.0"
-git tag -a v0.2.0 -m "v0.2.0"
+git commit -am "chore(release): v0.3.x"
+git tag -a v0.3.x -m "v0.3.x"
 git push origin main --tags
 ```
 
