@@ -95,6 +95,14 @@ MERMAID_BLOCK_RE = re.compile(
 PRE_RE = re.compile(r"<pre\b[^>]*>(.*?)</pre\s*>", re.S | re.I)
 CODE_INNER_RE = re.compile(r"<code\b([^>]*)>(.*?)</code\s*>", re.S | re.I)
 
+# 编辑器 / 预览器会往 HTML 注入记账属性（data-page-node-id 之类），注入点包括
+# 代码块与 mermaid 源码里的 <br/>。这类属性一旦混进 mermaid 源码，mermaid 就
+# 认不出 <br>、把它当字面文本渲染（图上会出现 <br data-page-node-id="...">），
+# 混进代码块则会变成卡片里的噪声。渲染前统一剥掉。
+EDITOR_ATTR_RE = re.compile(
+    r"""\s+data-(?:page-node|node|block|element|editor)[a-z-]*=(?:"[^"]*"|'[^']*')""",
+    re.I)
+
 ENTITIES = [("&lt;", "<"), ("&gt;", ">"), ("&quot;", '"'), ("&#39;", "'"),
             ("&nbsp;", " "), ("&amp;", "&")]
 
@@ -494,13 +502,14 @@ def transform_mermaid(html, st, cfg, base_dir, report, dry):
     def fence_repl(m):
         if (m.group("lang") or "").lower() != "mermaid":
             return m.group(0)
-        blocks.append([m.group("code"), m.group(0)])
+        blocks.append([EDITOR_ATTR_RE.sub("", m.group("code")), m.group(0)])
         return "\x00MMK{}\x00".format(len(blocks) - 1)
 
     html = FENCE_RE.sub(fence_repl, html)
 
     def block_repl(m):
-        blocks.append([unescape_entities(m.group(2)).strip(), m.group(0)])
+        src = unescape_entities(m.group(2)).strip()
+        blocks.append([EDITOR_ATTR_RE.sub("", src), m.group(0)])
         return "\x00MMK{}\x00".format(len(blocks) - 1)
 
     html = MERMAID_BLOCK_RE.sub(block_repl, html)
@@ -562,7 +571,7 @@ def transform_code(html, st, cfg, report, dry):
         label = meta.lstrip(":").strip()
         if label.lower().startswith("title="):
             label = label[6:].strip().strip('"').strip("'")
-        code = m.group("code").strip("\n")
+        code = EDITOR_ATTR_RE.sub("", m.group("code")).strip("\n")
         if not code.strip():
             return m.group(0)
         stash.append(build_code_section(lang, label, code, st, copts))
@@ -583,7 +592,7 @@ def transform_code(html, st, cfg, report, dry):
         cm = CODE_INNER_RE.search(inner)
         if cm:
             attrs, code = cm.group(1), cm.group(2)
-        code = unescape_entities(code)
+        code = EDITOR_ATTR_RE.sub("", unescape_entities(code))
         if code.startswith("\n"):
             code = code[1:]
         code = code.rstrip("\n")

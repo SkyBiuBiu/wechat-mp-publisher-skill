@@ -249,6 +249,11 @@ def upload_cover_material(token, abs_path):
 # ---------------------------------------------------------------- 正文处理
 IMG_LOCAL_RE = re.compile(r'(<img\b[^>]*?\bsrc\s*=\s*["\'])([^"\']+)(["\'])', re.I)
 COMMENT_RE = re.compile(r"<!--.*?-->", re.S)
+# 编辑器 / 预览器注入的记账属性，微信会剥掉未知属性，但它们会先撑大 content
+# 字段的长度、可能撞上 2 万字符上限，所以发送前先剥掉（preflight 同口径处理）
+EDITOR_ATTR_RE = re.compile(
+    r"""\s+data-(?:page-node|node|block|element|editor)[a-z-]*=(?:"[^"]*"|'[^']*')""",
+    re.I)
 
 
 def rewrite_local_images(token, html, base_dir):
@@ -417,6 +422,12 @@ def cmd_draft(cfg, args):
     if n_cmt:
         out("[i] 剥离了 {} 段 HTML 注释（公众号本身也会过滤，不影响成稿）".format(n_cmt))
 
+    # 编辑器会往 HTML 注入记账属性（data-page-node-id 之类）。微信同样会剥掉未知属性，
+    # 但它们会先撑大 content 字段、撞上 2 万字符上限，所以发送前剥掉。
+    content, n_attr = EDITOR_ATTR_RE.subn("", content)
+    if n_attr:
+        out("[i] 剥离了 {} 处编辑器注入的记账属性（微信会过滤，不影响成稿）".format(n_attr))
+
     if len(content) > CONTENT_MAX_CHARS:
         die("正文 {} 字符，超过 {} 上限".format(len(content), CONTENT_MAX_CHARS))
     if len(content.encode("utf-8")) > 1024 * 1024:
@@ -515,7 +526,8 @@ def cmd_list(cfg, args):
     for it in items:
         mid = str(it.get("media_id") or "")
         for n in it.get("content", {}).get("news_item", []):
-            out("  - [{}...] {}".format(mid[:24], n.get("title")))
+            shown = mid if args.full else (mid[:24] + "...")
+            out("  - [{}] {}".format(shown, n.get("title")))
 
 
 # ---------------------------------------------------------------- main
@@ -537,6 +549,8 @@ def main():
                    help="发布时跳过交互确认（危险，脚本化场景才用）")
     p.add_argument("--media-id", default=None,
                    help="配合 publish 使用：直接发布这条已存在的草稿，不重新建草稿")
+    p.add_argument("--full", action="store_true",
+                   help="配合 list 使用：列出完整 media_id（删除指定草稿时要靠它）")
     p.add_argument("--no-enhance", action="store_true",
                    help="draft 前不做内容增强（mermaid 渲染 + 代码块重建）")
     p.add_argument("--no-preflight", action="store_true",

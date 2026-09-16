@@ -55,6 +55,43 @@ def font(size, bold=False):
     return ImageFont.load_default()
 
 
+def split_title(title, title_size, draw, max_w, soft_w):
+    """标题折行，返回 1~2 行。
+
+    - 含显式换行（\\n）时原样尊重，不再自动断
+    - 英文标题在空格处断，避免断在词中间（旧版按字符数对半切，会把 Harness 切成 Harn / ess）
+    - 中文标题按视觉宽度从中点向两侧找断点
+    - max_w 是硬上限（超出会溢出画布），soft_w 是软上限（超过就倾向折两行）
+    """
+    if "\n" in title:
+        return [s.strip() for s in title.split("\n") if s.strip()]
+
+    f = font(title_size, True)
+
+    def width(t):
+        return draw.textlength(t, font=f)
+
+    if width(title) <= soft_w:
+        return [title]
+
+    mid = len(title) / 2.0
+    latin = sum(1 for ch in title if ch.isascii()) / max(1, len(title))
+    if latin > 0.5:
+        spaces = [i for i, ch in enumerate(title) if ch == " "]
+        if spaces:
+            cut = min(spaces, key=lambda i: abs(i - mid))
+            head, tail = title[:cut].rstrip(), title[cut + 1:].lstrip()
+            if head and tail and width(head) <= max_w and width(tail) <= max_w:
+                return [head, tail]
+
+    cut = int(mid)
+    while cut > 1 and width(title[:cut]) > max_w:
+        cut -= 1
+    if cut <= 1:
+        return [title]
+    return [title[:cut], title[cut:]]
+
+
 def make_cover(out_dir, brand, title, subtitle, date_str):
     W, H = 900 * S, 383 * S
     img = Image.new("RGB", (W, H), BG)
@@ -63,13 +100,14 @@ def make_cover(out_dir, brand, title, subtitle, date_str):
     d.rectangle([0, 0, 7 * S, H], fill=ORANGE)
     d.text((56 * S, 48 * S), brand, font=font(19), fill=ORANGE)
 
-    # 标题超长自动折成两行
-    if len(title) > 9:
-        cut = (len(title) + 1) // 2
-        d.text((56 * S, 96 * S), title[:cut], font=font(50, True), fill=FG)
-        d.text((56 * S, 160 * S), title[cut:], font=font(50, True), fill=FG)
+    # 标题折成 1~2 行；两行时缩一档字号，保证长标题不溢出
+    lines = split_title(title, 50, d, (900 - 112) * S, 520 * S)[:2]
+    if len(lines) == 1:
+        d.text((56 * S, 126 * S), lines[0], font=font(56, True), fill=FG)
     else:
-        d.text((56 * S, 126 * S), title, font=font(56, True), fill=FG)
+        tf = font(50, True)
+        for i, line in enumerate(lines):
+            d.text((56 * S, (96 + i * 64) * S), line, font=tf, fill=FG)
 
     d.line([(57 * S, 236 * S), (151 * S, 236 * S)], fill=ORANGE, width=2 * S)
     d.text((56 * S, 256 * S), subtitle, font=font(21), fill=MUTED)
@@ -129,7 +167,9 @@ def main():
     p.add_argument("-o", "--out", default=os.path.join(os.getcwd(), "assets"),
                    help="输出目录，默认 当前目录/assets")
     p.add_argument("--brand", default="公众号 · 工程笔记", help="封面左上角署名")
-    p.add_argument("--title", default="文章标题", help="封面主标题（超 9 字自动折两行）")
+    p.add_argument("--title", default="文章标题",
+                   help="封面主标题。过长自动折两行：英文断在空格处、中文按宽度断；"
+                        "想自己控制换行就在参数里写 \\n")
     p.add_argument("--subtitle", default="副标题 / 一句话摘要", help="封面副标题")
     p.add_argument("--date", default="", help="封面日期，留空不显示")
     args = p.parse_args()
