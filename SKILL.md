@@ -1,5 +1,5 @@
 ---
-name: wechat-mp-publisher
+name: wechat-mp-publisher-skill
 description: 微信公众号图文发布技能。当用户要求「发公众号」「发一篇公众号文章/推文」「推到公众号草稿箱」「公众号排版发布」「把这篇发到微信公众号」时使用。支持六种可选的图文风格路线（工程橙/极简纸感/终端绿/杂志暖调/商务蓝/清单问答）与自定义 token；mermaid 图渲染成 PNG、代码围栏重建为可长按复制的内联高亮卡片（不转图片），发布前自动做平台约束体检（标题 32 字、作者 16 字、摘要 120 字、正文 2 万字符、图片体积与格式、外链图、排版与合规风险词），再通过微信官方 API 完成 access_token 获取、正文图片上传换链、封面永久素材上传、图文草稿创建，并可选正式发布。内置错误码中文翻译、IP 白名单诊断与白名单生效轮询。
 agent_created: true
 ---
@@ -226,7 +226,7 @@ python <skill>/scripts/publish.py draft -c wechat-publish/config.json
 
 ## 九、仓库与迭代
 
-本技能同时是开源仓库 `SkyBiuBiu/wechat-mp-publisher`（MIT），仓库根目录即技能根目录。
+本技能同时是开源仓库 `SkyBiuBiu/wechat-mp-publisher-skill`（MIT），仓库根目录即技能根目录。
 
 | 想找什么 | 去哪 |
 |---|---|

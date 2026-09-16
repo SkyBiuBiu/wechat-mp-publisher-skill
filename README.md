@@ -1,6 +1,6 @@
 <div align="center">
 
-# wechat-mp-publisher
+# wechat-mp-publisher-skill
 
 **微信公众号图文发布工具 —— 技能 / 独立 CLI**
 
@@ -8,9 +8,9 @@
 排版、配图、上传、成稿全自动，你只剩最后点一下「发表」。<br>
 六条风格预设路线可选，发布前自动过 53 项平台约束体检。
 
-[![CI](https://github.com/SkyBiuBiu/wechat-mp-publisher/actions/workflows/ci.yml/badge.svg)](https://github.com/SkyBiuBiu/wechat-mp-publisher/actions/workflows/ci.yml)
+[![CI](https://github.com/SkyBiuBiu/wechat-mp-publisher-skill/actions/workflows/ci.yml/badge.svg)](https://github.com/SkyBiuBiu/wechat-mp-publisher-skill/actions/workflows/ci.yml)
 [![License: MIT](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
-[![Version](https://img.shields.io/github/v/tag/SkyBiuBiu/wechat-mp-publisher)](CHANGELOG.md)
+[![Version](https://img.shields.io/github/v/tag/SkyBiuBiu/wechat-mp-publisher-skill)](CHANGELOG.md)
 [![Python](https://img.shields.io/badge/python-3.9%2B-3776AB.svg)](https://www.python.org/)
 
 </div>
@@ -75,36 +75,36 @@
 
 ```bash
 # Linux / macOS
-git clone https://github.com/SkyBiuBiu/wechat-mp-publisher.git \
-          ~/.workbuddy/skills/wechat-mp-publisher
+git clone https://github.com/SkyBiuBiu/wechat-mp-publisher-skill.git \
+          ~/.workbuddy/skills/wechat-mp-publisher-skill
 ```
 
 ```powershell
 # Windows PowerShell
-git clone https://github.com/SkyBiuBiu/wechat-mp-publisher.git `
-          "$env:USERPROFILE\.workbuddy\skills\wechat-mp-publisher"
+git clone https://github.com/SkyBiuBiu/wechat-mp-publisher-skill.git `
+          "$env:USERPROFILE\.workbuddy\skills\wechat-mp-publisher-skill"
 ```
 
 装好后**开一个新会话**，技能列表在会话启动时加载。之后说「帮我把这篇文章发到公众号」就会自动触发。
 
-更新技能：`cd ~/.workbuddy/skills/wechat-mp-publisher && git pull`
+更新技能：`cd ~/.workbuddy/skills/wechat-mp-publisher-skill && git pull`
 
 ### 作为独立命令行工具
 
 不需要技能宿主，clone 到任意位置直接用：
 
 ```bash
-git clone https://github.com/SkyBiuBiu/wechat-mp-publisher.git
-cd wechat-mp-publisher
+git clone https://github.com/SkyBiuBiu/wechat-mp-publisher-skill.git
+cd wechat-mp-publisher-skill
 python scripts/publish.py --help
 ```
 
-或从 [Releases](https://github.com/SkyBiuBiu/wechat-mp-publisher/releases) 下载 zip 解压。
+或从 [Releases](https://github.com/SkyBiuBiu/wechat-mp-publisher-skill/releases) 下载 zip 解压。
 
 ## 快速开始
 
 ```bash
-cd wechat-mp-publisher
+cd wechat-mp-publisher-skill
 
 # 1. 准备配置（只有 appid / appsecret 是必填）
 mkdir -p work/assets
@@ -267,7 +267,7 @@ python scripts/publish.py <子命令> [参数]
 ## 目录结构
 
 ```
-wechat-mp-publisher/
+wechat-mp-publisher-skill/
 ├── SKILL.md                        # 技能入口（触发条件、风格、工作流、排障）
 ├── README.md                       # 本文件
 ├── docs/manual.md                  # 完整操作手册：后台路径、白名单排查、报错表

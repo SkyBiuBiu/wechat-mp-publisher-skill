@@ -654,7 +654,7 @@ def print_report(findings, stats, cfg_path, quiet=False):
 
     if not quiet:
         out("=" * 66)
-        out("  wechat-mp-publisher · 发布前体检")
+        out("  wechat-mp-publisher-skill · 发布前体检")
         out("  配置：{}".format(cfg_path))
         out("=" * 66)
 

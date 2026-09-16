@@ -83,7 +83,7 @@ jobs:
       - name: 上传产物
         uses: actions/upload-artifact@v4
         with:
-          name: wechat-mp-publisher-dist
+          name: wechat-mp-publisher-skill-dist
           path: dist/*.zip
           if-no-files-found: error
           retention-days: 14

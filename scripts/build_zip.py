@@ -3,8 +3,8 @@
 """
 打包分发包（Windows / Linux 通用，零第三方依赖）。
 
-产物：dist/wechat-mp-publisher-v<版本>.zip
-压缩包内顶层目录为 wechat-mp-publisher/，解压后可直接：
+产物：dist/wechat-mp-publisher-skill-v<版本>.zip
+压缩包内顶层目录为 wechat-mp-publisher-skill/，解压后可直接：
   1. 放到 ~/.workbuddy/skills/ 作为技能使用
   2. 直接 cd 进去当命令行工具用
 
@@ -66,13 +66,13 @@ def collect():
 
 
 def main():
-    ap = argparse.ArgumentParser(description="打包 wechat-mp-publisher 分发包")
+    ap = argparse.ArgumentParser(description="打包 wechat-mp-publisher-skill 分发包")
     ap.add_argument("--out", default=os.path.join(ROOT, "dist"), help="输出目录，默认 <仓库>/dist")
     args = ap.parse_args()
 
     version = read_version()
     os.makedirs(args.out, exist_ok=True)
-    zip_name = "wechat-mp-publisher-v{}.zip".format(version)
+    zip_name = "wechat-mp-publisher-skill-v{}.zip".format(version)
     zip_path = os.path.join(args.out, zip_name)
 
     items = collect()

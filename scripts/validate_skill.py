@@ -312,7 +312,7 @@ def main():
     quiet = "--quiet" in sys.argv or "-q" in sys.argv
 
     print("=" * 64)
-    print("  wechat-mp-publisher · 仓库自检")
+    print("  wechat-mp-publisher-skill · 仓库自检")
     print("  根目录：{}".format(ROOT))
     print("=" * 64)
 

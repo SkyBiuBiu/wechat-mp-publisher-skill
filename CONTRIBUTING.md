@@ -41,8 +41,8 @@
 ## 开发流程
 
 ```bash
-git clone https://github.com/SkyBiuBiu/wechat-mp-publisher.git
-cd wechat-mp-publisher
+git clone https://github.com/SkyBiuBiu/wechat-mp-publisher-skill.git
+cd wechat-mp-publisher-skill
 
 # 改完之后自检（结构 + 语法 + 密钥扫描 + 引用路径）
 python scripts/validate_skill.py

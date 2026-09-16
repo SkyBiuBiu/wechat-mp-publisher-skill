@@ -17,6 +17,11 @@
   修正版本徽章（0.2.0 → 动态 v/tag）、token 数（16 → 17）、体检规则数（51 → 53）、
   封面建议（900×383 → 2x 高清 1800×766），补充 mermaid 高清与图片高清门槛说明
 
+### Docs
+
+- 仓库改名为 wechat-mp-publisher-skill：GitHub 仓库名、技能目录名、SKILL.md name、
+  clone/badge URL、zip 产物名、User-Agent 与自检 banner 全部同步更新（旧 URL 由 GitHub 自动重定向）
+
 ### 计划中
 
 - 多图文（一次草稿投多篇）支持

@@ -471,7 +471,7 @@ def render_mermaid(src, idx, out_dir, st, mcfg):
         url = "https://mermaid.ink/img/{}?type=png&scale={}&width={}".format(
             b64, scale, width)
         req = urllib.request.Request(url, headers={
-            "User-Agent": "wechat-mp-publisher/0.3"})
+            "User-Agent": "wechat-mp-publisher-skill/0.3"})
         try:
             with urllib.request.urlopen(req, timeout=40) as resp:
                 data = resp.read()
