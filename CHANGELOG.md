@@ -9,7 +9,58 @@
 
 ## [Unreleased]
 
-## [Unreleased]
+### 计划中
+
+- 多图文（一次草稿投多篇）支持
+- `publish.py status --publish-id XXX` 查询发布任务最终状态
+- 封面裁剪比例 `cover_info.crop_percent_list` 支持（`2.35_1` / `1_1`）
+- 图片消息（`article_type=newspic`）支持
+
+## [0.4.0] - 2026-09-16
+
+### Changed
+
+- **预设不再定义写作，只定义视觉**。六条路线预设原本各带一个 `writing` 段，用 `tone` /
+  `opening` / `heading` / `paragraph` / `emoji` / `closing` / `avoid` 七个字段规定文章
+  怎么写 —— 开篇必须怎样、小标题必须怎样、收尾必须落在哪。结果是同一路线的文章结构被
+  锁死：工程橙的 `closing` 甚至写明了「收尾落到『所以什么场景该用、什么场景别用』」，
+  每篇末尾都会长出一段选型清单。现整个 `writing` 段已从预设移除，预设只剩 `tokens`
+  （配色 / 字号 / 间距）与 `code_highlight`（代码高亮）—— 文章写什么、分几节、怎么收尾，
+  由正文自己的论证逻辑决定。
+  - `SKILL.md` 第三节从「风格路线」改为「视觉风格」，写明预设不约束文章内容与结构
+  - `references/style-presets.md` 的写作层章节改写为「写作：预设不参与」，给出按内容
+    选结构的对照（教人做事 → 操作顺序 / 讲机制 → 是什么·怎么运作·边界 / 复盘 → 时间线 /
+    问答 → 按问题组织）
+  - `best_for` 改称「常配题材」，`apply_style.py --list` 输出时标注（参考，不限制你写什么）
+  - `validate_skill.py` 新增守卫：预设含 `writing` 段、或有未识别的顶层键，即判为不合格
+  - `README.md`、`docs/manual.md`、`assets/templates/config.example.json` 同步：术语统一为
+    「视觉风格」，预设表去掉「语气」列，改为「视觉观感 + 常配题材（参考）」；`manual.md`
+    第五节标题相应从「选风格路线」改为「选视觉风格」
+  - 连带下线 `WX215`（唯一依赖 `writing.emoji` 的检查），体检规则 53 → 52
+
+### Fixed
+
+- **`publish.py list` 把 media_id 截断到 24 字符**，而删除草稿必须用完整 media_id ——
+  等于列出来的 ID 没法直接用于 `delete`，得另外想办法取。现加 `--full` 开关输出完整 ID；
+  默认仍截断，避免刷屏。配合 `delete --media-id` 就能走完「确认是哪一版 → 删掉」的闭环
+- **编辑器注入的记账属性会污染成稿**：本地编辑器/预览器会往 HTML 里塞
+  `data-page-node-id="…"` 之类的记账属性，注入点包括代码块与 mermaid 源码里的
+  `<br/>`。混进 mermaid 源码后，mermaid 认不出这个 `<br>`、把它当字面文本渲染，
+  图上会直接印出 `<br data-page-node-id="…">`。三处同步修掉：
+  - `enhance_content.py` 渲染前剥离（含 ``` 围栏与 `<pre><code>` 两条路径）
+  - `preflight.py` 与 `publish.py` 同样剥离，保证「体检的就是发送的」
+  - `preflight.py` 的 2 万字符计数不再把这些属性算进去 —— 一份 1.5 万字符的稿子
+    曾因此被误报成 22976 字符、判 P0 阻断
+- `make_assets.py` 封面标题折行：旧版按 `len(title)` 对半切，英文标题会断在词中间
+  （`Agent = Harness + Model` → `Agent = Harn` / `ess + Model`），且不测像素宽度，
+  长标题会溢出画布。现改为：英文在空格处断、中文按 `textlength` 从视觉中点找断点，
+  并支持用 `\n` 手动指定换行
+- `preflight.py` WX112 误报：`enhance_content.py` 重建的代码卡片用单个 `<p>` 承载整段
+  代码，天然超过 250 字，此前会被逐条报成「超长段落」。现按 `font-family:…monospace`
+  识别并跳过 —— 代码卡片的长短由代码决定，不是排版问题
+- `validate_skill.py` 密钥扫描：跳过 `.token_cache*.json`（.gitignore 已忽略的运行时
+  产物，必然含 AppID）。此前只要在仓库内跑过一次请求，自检就会恒红
+- `CHANGELOG.md` 有两个重复的 `## [Unreleased]` 与 `### Docs` 标题，合并为一
 
 ### Docs
 
@@ -17,18 +68,8 @@
   体检规则数（51 → 53）、封面建议（900×383 → 2x 高清 1800×766），补充 mermaid 高清
   与图片高清门槛说明；随后去掉「人/AI 双读者」「给 AI agent 的指引」等元叙事与模板化
   结构，改为自然叙述，消除 AI 味
-
-### Docs
-
 - 仓库改名为 wechat-mp-publisher-skill：GitHub 仓库名、技能目录名、SKILL.md name、
   clone/badge URL、zip 产物名、User-Agent 与自检 banner 全部同步更新（旧 URL 由 GitHub 自动重定向）
-
-### 计划中
-
-- 多图文（一次草稿投多篇）支持
-- `publish.py status --publish-id XXX` 查询发布任务最终状态
-- 封面裁剪比例 `cover_info.crop_percent_list` 支持（`2.35_1` / `1_1`）
-- 图片消息（`article_type=newspic`）支持
 
 ## [0.3.5] - 2026-09-16
 
