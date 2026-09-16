@@ -63,6 +63,14 @@ FONT_SIZE_RE = re.compile(r"font-size\s*:\s*(\d+(?:\.\d+)?)px", re.I)
 LINE_HEIGHT_RE = re.compile(r"line-height\s*:\s*(\d+(?:\.\d+)?)\s*(?:;|\"|')", re.I)
 PARA_RE = re.compile(r"<p\b[^>]*>(.*?)</p>", re.I | re.S)
 
+# 编辑器 / 预览器会往 HTML 里注入记账属性（可见的有 data-page-node-id、
+# data-node-id、data-block-id 等）。微信侧同样会剥掉未知属性，所以它们不属于
+# 正文，不该占 2 万字符额度 —— 否则一份 1.5 万字符的稿子会被误报成超限。
+# 与 HTML 注释同理，处理方式是剥离而不是让作者删内容。
+EDITOR_ATTR_RE = re.compile(
+    r"""\s+data-(?:page-node|node|block|element|editor)[a-z-]*=(?:"[^"]*"|'[^']*')""",
+    re.I)
+
 P0, P1, P2 = "P0", "P1", "P2"
 LEVEL_NAME = {P0: "阻断", P1: "警告", P2: "建议"}
 
@@ -305,6 +313,11 @@ def check_content(cfg, base_dir, findings, stats):
     if n_cmt:
         out("[i] 已剥离 {} 段 HTML 注释（公众号也会过滤，不计入校验）".format(n_cmt))
 
+    content, n_attr = EDITOR_ATTR_RE.subn("", content)
+    if n_attr:
+        out("[i] 已剥离 {} 处编辑器注入的记账属性"
+            "（微信会过滤，不计入校验）".format(n_attr))
+
     # ---- 字符数与体积：微信按 content 字段的 HTML 长度算
     n_chars = len(content)
     n_bytes = len(content.encode("utf-8"))
@@ -476,9 +489,12 @@ def check_layout(content, findings, stats):
             "给每个 <td>/<th> 加 style=\"padding:9px 10px;\"，不然文字贴边")
     stats["tables"] = len(re.findall(r"<table\b", content, re.I))
 
-    # 段落长度
+    # 段落长度（代码卡片用单个 <p> 承载整段代码，天然超长，不计入）
     long_paras = 0
     for pm in PARA_RE.finditer(content):
+        open_tag = pm.group(0)[: pm.group(0).find(">") + 1]
+        if "monospace" in open_tag:
+            continue
         plain = strip_tags(pm.group(1))
         if len(plain) > 250:
             long_paras += 1
@@ -605,24 +621,6 @@ def check_style(cfg, findings, stats):
         if real:
             stats["style_overrides"] = len(real)
 
-    # 风格与正文的实际写法是否对得上（emoji 是最容易跑偏的一项）
-    policy = ((data.get("writing") or {}).get("emoji") or "")
-    if "禁止" in policy:
-        stats["emoji_banned"] = True
-
-
-def check_emoji(content, findings, stats):
-    if not stats.get("emoji_banned"):
-        return
-    plain = strip_tags(content)
-    emo = re.findall(
-        "[\U0001F300-\U0001FAFF\u2600-\u27BF\uFE0F]", plain)
-    if emo:
-        add(findings, P2, "WX215", "所选风格禁用 emoji，但正文里有",
-            "发现 {} 个：{}".format(len(emo), "".join(sorted(set(emo))[:8])),
-            "该风格的写作约束写明禁用 emoji，删掉或换风格（--preset magazine-warm 允许少量）")
-
-
 # ---------------------------------------------------------------- 报告
 def build_report(cfg, base_dir, with_compliance=True):
     findings = []
@@ -633,7 +631,6 @@ def build_report(cfg, base_dir, with_compliance=True):
     if content:
         if with_compliance:
             check_compliance(content, findings)
-        check_emoji(content, findings, stats)
     check_style(cfg, findings, stats)
 
     order = {P0: 0, P1: 1, P2: 2}

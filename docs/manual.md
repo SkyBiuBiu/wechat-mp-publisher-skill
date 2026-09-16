@@ -11,7 +11,7 @@
 - [二、配 IP 白名单](#二配-ip-白名单)
 - [三、填配置](#三填配置)
 - [四、跑链路](#四跑链路)
-- [五、选风格路线](#五选风格路线)
+- [五、选视觉风格](#五选视觉风格)
 - [六、读体检报告](#六读体检报告)
 - [七、报错对照](#七报错对照)
 - [八、安全边界](#八安全边界)
@@ -154,7 +154,7 @@ python scripts/apply_style.py --preset engineering-orange -o work/article.html
 | `appid` | 第一步记下的 AppID，`wx` 开头 18 位 |
 | `appsecret` | 第一步保存的 AppSecret |
 
-其余字段按需改：`article.title`（标题）、`article.digest`（摘要）、`article.content_file`（正文文件）、`article.cover_file`（封面路径）、`style.preset`（风格路线）。
+其余字段按需改：`article.title`（标题）、`article.digest`（摘要）、`article.content_file`（正文文件）、`article.cover_file`（封面路径）、`style.preset`（视觉风格）。
 
 > ⚠️ `config.json` 含密钥，**不要提交到 git、不要发给别人**。本仓库的 `.gitignore` 已经排除了它。
 
@@ -188,7 +188,7 @@ python scripts/publish.py publish -c work/config.json
 ### 正文 HTML 怎么准备
 
 ```bash
-python scripts/apply_style.py --list                    # 先看六条风格路线
+python scripts/apply_style.py --list                    # 先看六条视觉风格
 python scripts/apply_style.py --preset terminal-green -o work/article.html
 ```
 
@@ -227,19 +227,20 @@ python scripts/make_assets.py --title "标题" --subtitle "副标题" --date "20
 
 ---
 
-## 五、选风格路线
+## 五、选视觉风格
 
-正文风格分**视觉**和**写作**两层，由 `assets/styles/*.json` 的六条路线定义。完整说明（含 16 个 token 字典）见
+预设只定义**视觉**：配色、字号、行高、圆角、表格与代码块的观感。文章写什么题材、分几节、
+怎么收尾，预设不参与。完整说明（含 17 个 token 字典）见
 [`references/style-presets.md`](../references/style-presets.md)，这里是速查：
 
-| 预设 | 适合 | 语气 |
+| 预设 | 视觉观感 | 常配题材（参考） |
 |---|---|---|
-| `engineering-orange` 工程橙（默认） | 实战教程、架构拆解、踩坑复盘 | 结论先行，像交接文档 |
-| `minimal-paper` 极简纸感 | 观点随笔、方法论、行业观察 | 平静有判断 |
-| `terminal-green` 终端绿 | 源码分析、CLI 教程、报错定位 | 直给可执行 |
-| `magazine-warm` 杂志暖调 | 项目复盘、访谈、团队故事 | 有温度不说教 |
-| `business-blue` 商务蓝 | 方案说明、选型对比、阶段汇报 | 客观有依据 |
-| `checklist-qa` 清单问答 | FAQ、SOP、避坑清单 | 干脆，一问一答 |
+| `engineering-orange` 工程橙（默认） | 暖调橙 + 深色代码块，长文耐读 | 实战教程、架构拆解、踩坑复盘 |
+| `minimal-paper` 极简纸感 | 无彩色块，留白与细横线分层 | 观点随笔、方法论、行业观察 |
+| `terminal-green` 终端绿 | 深底绿 + 终端感代码块 | 源码分析、CLI 教程、报错定位 |
+| `magazine-warm` 杂志暖调 | 暖色底、大引文、圆角卡片 | 项目复盘、访谈、团队故事 |
+| `business-blue` 商务蓝 | 冷调蓝 + 细线分隔，信息密度高 | 方案说明、选型对比、阶段汇报 |
+| `checklist-qa` 清单问答 | 浅底高对比，块状分隔清晰 | FAQ、SOP、避坑清单 |
 
 选不准就看题材：**教人做事** → 工程橙 / 终端绿；**讲一个判断** → 极简纸感 / 商务蓝；**讲一件事** → 杂志暖调；**回答问题** → 清单问答。
 
@@ -262,15 +263,16 @@ python scripts/apply_style.py --preset business-blue --set primary=#1f4e8c
 
 ```bash
 python scripts/apply_style.py --preset magazine-warm --dump my-style.json
-# 编辑 my-style.json：改 tokens（颜色/字号）与 writing（语气/开篇/段落/emoji/收尾）
+# 编辑 my-style.json：改 tokens（颜色 / 字号 / 间距 / 圆角）
 python scripts/apply_style.py --style-file my-style.json -o work/article.html
 ```
 
 token 写错会被直接拦下：颜色必须是 `#rgb` / `#rrggbb`（不支持 `red`、`rgb()`、`var(--x)`），尺寸必须带单位。
 `config.json` 里写错的 token 名，体检时会报 `WX214`。
 
-**两层要匹配**：视觉改了，写作约束也要跟着改，否则会出现「极简的皮 + 营销的骨」。
-渲染出的骨架里的块（要点卡片、表格、代码块、问答块、步骤条）按题材挑用，不用的整段删掉。
+**视觉和写作分开管**：预设只决定配色与排版，换配色不会改掉文章怎么写。渲染出的骨架里的块
+（要点卡片、表格、代码块、问答块、步骤条）按内容需要挑用，不够就加、用不上就删 ——
+骨架给的是可用的零件，不是必须填满的表格。
 
 ---
 

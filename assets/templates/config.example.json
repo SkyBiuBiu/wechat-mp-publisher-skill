@@ -10,7 +10,7 @@
 
   "author": "Sky",
 
-  "_style": "推文风格路线。preset 取 assets/styles/ 下的文件名（不带 .json）；overrides 只写要改的 token，其余继承预设。可用 python scripts/apply_style.py --list 查看全部",
+  "_style": "推文视觉风格。preset 取 assets/styles/ 下的文件名（不带 .json）；overrides 只写要改的 token，其余继承预设。可用 python scripts/apply_style.py --list 查看全部。预设只管视觉，不影响文章内容与结构",
   "style": {
     "preset": "engineering-orange",
     "overrides": {

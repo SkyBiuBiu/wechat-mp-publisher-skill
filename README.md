@@ -31,7 +31,7 @@
 
 ## 特点
 
-- **六种风格预设**：工程橙 / 极简纸感 / 终端绿 / 杂志暖调 / 商务蓝 / 清单问答。视觉（配色、字号、卡片样式）和写作（语气、开篇、段落、emoji）两层都由预设定义，17 个 token 可以单独覆盖，也可以导出整份自己改。详见 [`references/style-presets.md`](references/style-presets.md)。
+- **六种视觉预设**：工程橙 / 极简纸感 / 终端绿 / 杂志暖调 / 商务蓝 / 清单问答。预设只定义视觉（配色、字号、卡片样式、代码高亮），17 个 token 可以单独覆盖，也可以导出整份自己改 —— 文章写什么、分几节、怎么收尾，预设不管。详见 [`references/style-presets.md`](references/style-presets.md)。
 - **发布前体检**：`preflight.py` 在本地把会翻车的地方拦掉——标题 32 字、作者 16 字、摘要 120 字、正文 2 万字符 / 1MB、图片体积格式、外链图、会被编辑器剥掉的 HTML 写法、排版问题、广告法和导流风险词。分 P0 阻断 / P1 警告 / P2 建议三级，每条都给处理办法。
 - **图片清晰度把关**：发布前自动查——封面宽小于 1200px、正文图宽小于 750px 会直接提示会糊；`make_assets.py` 生成的封面和配图本身就是 2x 高清（1800×766）。
 - **mermaid 高清渲染**：正文里写 ```mermaid 围栏，发布前渲染成 PNG（本地 mmdc 优先，mermaid.ink 兜底）。默认 `scale=3`，输出约 3600px 宽，手机上看不糊。
@@ -108,14 +108,14 @@ python scripts/publish.py draft -c work/config.json
 
 ### 风格预设
 
-| 预设 | 适合 | 语气 |
+| 预设 | 视觉观感 | 常配题材（参考） |
 |---|---|---|
-| `engineering-orange` 工程橙（默认） | 实战教程、架构拆解、踩坑复盘 | 结论先行，像交接文档 |
-| `minimal-paper` 极简纸感 | 观点随笔、方法论、行业观察 | 平静有判断 |
-| `terminal-green` 终端绿 | 源码分析、CLI 教程、报错定位 | 直给可执行 |
-| `magazine-warm` 杂志暖调 | 项目复盘、访谈、团队故事 | 有温度不说教 |
-| `business-blue` 商务蓝 | 方案说明、选型对比、阶段汇报 | 客观有依据 |
-| `checklist-qa` 清单问答 | FAQ、SOP、避坑清单 | 干脆，一问一答 |
+| `engineering-orange` 工程橙（默认） | 暖调橙 + 深色代码块，长文耐读 | 实战教程、架构拆解、踩坑复盘 |
+| `minimal-paper` 极简纸感 | 无彩色块，留白与细横线分层 | 观点随笔、方法论、行业观察 |
+| `terminal-green` 终端绿 | 深底绿 + 终端感代码块 | 源码分析、CLI 教程、报错定位 |
+| `magazine-warm` 杂志暖调 | 暖色底、大引文、圆角卡片 | 项目复盘、访谈、团队故事 |
+| `business-blue` 商务蓝 | 冷调蓝 + 细线分隔，信息密度高 | 方案说明、选型对比、阶段汇报 |
+| `checklist-qa` 清单问答 | 浅底高对比，块状分隔清晰 | FAQ、SOP、避坑清单 |
 
 自定义分三级：
 
@@ -149,7 +149,7 @@ P2 · 建议 · 3 项        ← 不影响发布，改了更好
 
 有 P0 时退出码为 1，`draft` 会就地停下（此时还没发任何请求）。`--warn-only` 只报告不拦截，`--json` 给 CI 用，`--no-compliance` 跳过合规词扫描。
 
-53 条检查项的判定依据（官方硬约束 / 实测行为 / 经验阈值三类）见 [`references/wechat-api-reference.md`](references/wechat-api-reference.md) 第六节。
+52 条检查项的判定依据（官方硬约束 / 实测行为 / 经验阈值三类）见 [`references/wechat-api-reference.md`](references/wechat-api-reference.md) 第六节。
 
 ## 命令参考
 
@@ -203,7 +203,7 @@ python scripts/publish.py <子命令> [参数]
 | `appid` | ✅ | 微信开发者平台 → 公众号 → 基础信息 → 开发密钥 |
 | `appsecret` | ✅ | 同上，只显示一次，当场存好 |
 | `author` | | 作者，上限 16 字 |
-| `style.preset` | | 风格路线 id，不填用 `engineering-orange` |
+| `style.preset` | | 视觉风格 id，不填用 `engineering-orange` |
 | `style.overrides` | | 只写要改的 token，如 `{"primary": "#1f4e8c"}`，其余继承预设 |
 | `mermaid.remote` | | mermaid 渲染走 mermaid.ink 在线服务（默认 `true`）；涉密图表装 mmdc 后设 `false` |
 | `mermaid.scale` | | 渲染倍率，默认 `3`（与 width 共同决定输出像素，越高越清晰） |
@@ -241,7 +241,7 @@ wechat-mp-publisher-skill/
 │   └── build_zip.py                # 分发包打包
 ├── references/
 │   ├── wechat-api-reference.md     # 接口字段约束、权限矩阵、错误码全表、预检口径
-│   └── style-presets.md            # 风格路线、token 字典、自定义方式
+│   └── style-presets.md            # 视觉风格、token 字典、自定义方式
 ├── assets/
 │   ├── styles/                     # 六条风格预设（JSON）
 │   └── templates/

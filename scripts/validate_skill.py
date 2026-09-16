@@ -56,6 +56,10 @@ STYLE_TOKEN_KEYS = {
     "heading_size",
 }
 
+# 预设允许出现的顶层键 —— 只有视觉与元信息。写作约束、文章结构一律不进预设：
+# 同一套配色可以用在任何题材、任何结构上，把内容规则写进预设等于把它锁死。
+PRESET_KEYS = {"_说明", "id", "name", "tagline", "best_for", "tokens", "code_highlight"}
+
 # ---- 扫描时跳过的目录 --------------------------------------------------------
 SKIP_DIRS = {
     ".git", "__pycache__", "dist", "build", ".venv", "venv", "env",
@@ -64,6 +68,9 @@ SKIP_DIRS = {
 
 # ---- 密钥扫描：这些文件允许出现占位值 ----------------------------------------
 SECRET_SCAN_SKIP = {"config.example.json"}
+# .gitignore 已忽略的运行时产物：access_token 缓存。它不是仓库内容，且必然含
+# AppID（微信返回体里的原始字段），扫它只会让自检恒红。
+SECRET_SCAN_SKIP_RE = re.compile(r"^\.token_cache.*\.json$")
 SECRET_SCAN_EXTS = {".py", ".json", ".md", ".yml", ".yaml", ".html", ".txt", ".sh", ".ps1", ".bat", ""}
 
 APPID_RE = re.compile(r"\bwx[0-9a-fA-F]{16}\b")
@@ -211,6 +218,8 @@ def check_secrets():
         name = os.path.basename(path)
         if name in SECRET_SCAN_SKIP:
             continue
+        if SECRET_SCAN_SKIP_RE.match(name):
+            continue
         if os.path.splitext(name)[1].lower() not in SECRET_SCAN_EXTS:
             continue
         # 跳过本文件自身（里面的正则会自匹配）
@@ -285,8 +294,12 @@ def check_styles():
         missing = sorted(STYLE_TOKEN_KEYS - set((data.get("tokens") or {}).keys()))
         if missing:
             problems.append("{} 缺 token：{}".format(name, "、".join(missing)))
-        if not (data.get("writing") or {}).get("tone"):
-            problems.append("{} 的 writing.tone 为空".format(name))
+        if "writing" in data:
+            problems.append("{} 含 writing 段 —— 预设只定义视觉（配色 / 字号 / 间距 / "
+                            "代码高亮），文章写什么、分几节、怎么收尾由正文决定".format(name))
+        extra = sorted(set(data) - PRESET_KEYS)
+        if extra:
+            problems.append("{} 有未识别的顶层键：{}".format(name, "、".join(extra)))
 
     tpl = os.path.join(ROOT, "assets", "templates", "article.template.html")
     if os.path.isfile(tpl):

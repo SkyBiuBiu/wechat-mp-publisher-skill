@@ -248,10 +248,7 @@ def cmd_list():
         if data.get("tagline"):
             out("      {}".format(data["tagline"]))
         if data.get("best_for"):
-            out("      适合：{}".format("、".join(data["best_for"])))
-        w = (data.get("writing") or {})
-        if w.get("tone"):
-            out("      语气：{}".format(w["tone"]))
+            out("      常配题材：{}（参考，不限制你写什么）".format("、".join(data["best_for"])))
         out("")
     out("带 * 的是默认预设。用法：python apply_style.py --preset <id>")
     out("自定义：--set primary=#1f4e8c 局部覆盖，或 --dump my.json 导出后整份改。")
