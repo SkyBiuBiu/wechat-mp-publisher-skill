@@ -9,7 +9,8 @@
 | 路径 | 约束 |
 |---|---|
 | `SKILL.md` | **必须在根目录**，frontmatter 需含 `name` / `description` / `agent_created`，`name` 与目录名一致 |
-| `scripts/` | 可执行脚本。技能被调用时，AI 从这里找工具 |
+| `scripts/` | 可执行脚本。技能被调用时，AI 从这里找工具；**面向用户的能力一律放这里**（随分发包发布） |
+| `tools/` | **仅**放"开发辅助、用户跑不了"的脚本（需本机 Chrome / playwright 的配图与截图工具）。`build_zip.py` 的 `EXCLUDE_REL_PREFIXES` 会**整目录排除** `tools/` |
 | `references/` | 供 AI 参考的文档与主题组件库，按需加载，不进主上下文 |
 | `references/theme-index.md` | **主题信息的单一来源**。新增主题必须在此登记，否则 `validate_skill.py` 判 FAIL |
 | `references/theme-{标识}.md` | 单套主题组件库，五章节齐全（变量表 / 组件 / 骨架 / 配方表 / 映射表） |
@@ -60,6 +61,11 @@
 8. **改主题库必跑源头关**：`python scripts/component_lint.py .`，必须 0 ERROR。
    改产物装配逻辑必跑 `python scripts/validate_gzh_html.py <产物>`，0 ERROR 且半角 WARNING 为 0。
 9. **改主题库还要重生成 README 配图**：`python tools/make_theme_previews.py`。
+10. **新增脚本先问一句"用户要不要用它"**：
+    - 要（排成稿、出样张、推草稿、体检……）→ 放 `scripts/`，否则从 zip 安装的用户**永远拿不到**；
+    - 不要（只有改仓库时才跑，且依赖本机 Chrome/playwright）→ 放 `tools/`。
+    v0.7.2 就把面向用户的 `build_theme_showcase.py` 误放进 `tools/`，导致分发 zip 里没有它，
+    直到 v0.7.3 才移回 `scripts/`。
    `docs/images/theme-*.png` 是拿各主题的**真实组件**渲染出来的，不是示意图——
    组件一改图就过期，README 会开始说假话。该脚本需本机 Chrome，与 `docs/images/` 一样不进分发包。
 
