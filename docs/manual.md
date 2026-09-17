@@ -388,6 +388,11 @@ python scripts/build_theme_showcase.py --src work --out work/showcase --push   #
 `node tools/narrow_screen_check.js <成稿路径>`；想目视核对用
 `node tools/shot_article.js <成稿路径> <输出目录> <前缀>`（截顶部区 / 流程图 / 代码块）。
 
+> `--push` 会**先为基准目录取一次 access_token，再分发给每一版**再逐版推送。
+> 这不是多此一举：`publish.py` 按 `config.json` 所在目录找 `.token_cache.json`，
+> 六个样张目录会各持一份缓存，而公众号的 token 是单点有效的——逐版各自换 token
+> 会让先换的失效，表现为"推第一版成功、推第二版 40001"。
+
 ---
 
 ## 六、读体检报告

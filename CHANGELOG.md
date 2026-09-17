@@ -7,6 +7,20 @@
 
 版本号同步保存在根目录 `VERSION` 文件，打 tag 时用 `v<版本号>`（例：`v0.1.0`）。
 
+## [0.7.4] - 2026-09-17
+
+### Fixed
+
+- **`build_theme_showcase.py --push` 的 access_token 互相失效**：`publish.py` 是按
+  `config.json` **所在目录**找 `.token_cache.json` 的，所以六个样张目录各自持有一份缓存；
+  而公众号的 `access_token` 是**单点有效**的——逐版各自去换 token，后换的会让先换的失效，
+  表现为"推第一版成功、推第二版 40001"（手工绕过办法是把主目录的缓存逐个拷过去）。
+  现在 `--push` 会**先为基准目录取一次 token，再把这份缓存分发给每一版**，全程不重复换 token。
+
+### Docs
+
+- `docs/manual.md` 的主题样张章节补记该机制，省得以后又去手工拷缓存。
+
 ## [0.7.3] - 2026-09-17
 
 修一个**交付缺口**：v0.7.2 的头号新特性 `build_theme_showcase.py` 放在了 `tools/` 下，

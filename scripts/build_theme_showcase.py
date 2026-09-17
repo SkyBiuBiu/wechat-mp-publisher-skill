@@ -451,8 +451,24 @@ def main():
         out("    加 --push 可逐版推送到草稿箱")
         return
 
+    # 各主题目录各自持有一份 .token_cache.json（publish.py 是按 config.json 所在目录找缓存的）。
+    # 而公众号的 access_token 是**单点有效**的：逐版各自去换 token，后换的会让先换的失效，
+    # 于是"推第一版成功、推第二版 40001"。所以先为基准目录取一次，再把这份缓存分发给每一版，
+    # 全程不再重复换 token。
+    src_cache = os.path.join(src, ".token_cache.json")
+    rc, _ = run([PY, os.path.join(SCRIPTS, "publish.py"), "token", "-f",
+                 "-c", os.path.join(src, "config.json")])
+    if rc == 0 and os.path.exists(src_cache):
+        shared = io.open(src_cache, encoding="utf-8").read()
+        out("\n[i] 已取一份 access_token，{} 版共用（避免逐版换 token 互相失效）".format(len(built)))
+    else:
+        shared = None
+        out("\n[!] 预先取 token 失败，逐版将各自取 token（可能遇到 40001）")
+
     for i, (theme_id, name, tdir) in enumerate(built, 1):
         out("\n--- 推送 {}/{}  {} ---".format(i, len(built), name))
+        if shared:
+            io.open(os.path.join(tdir, ".token_cache.json"), "w", encoding="utf-8").write(shared)
         rc, log = run([PY, os.path.join(SCRIPTS, "publish.py"), "draft",
                        "-c", os.path.join(tdir, "config.json")])
         for line in log.splitlines():
