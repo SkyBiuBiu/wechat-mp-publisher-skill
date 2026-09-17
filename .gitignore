@@ -59,3 +59,6 @@ desktop.ini
 /tmp/
 /sandbox/
 /playground/
+
+# CI 里由 release.yml 从 CHANGELOG 生成的 Release 说明，本地试跑会留一份
+release_notes.md

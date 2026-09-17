@@ -115,6 +115,11 @@
   `GITHUB_TOKEN` 推送 tag，不会触发其他 workflow」（防递归）。若拆成「workflow A 打 tag →
   workflow B 监听 `v*` 发版」，B 一次都不会跑。这条限制已作为注释写在 `release.yml` 顶部，
   避免以后有人「顺手拆开优化」。
+- **Release 说明改为取自 `CHANGELOG.md` 对应版本的段落**。原先用 action 自带的
+  `generate_release_notes`，它只按「已合并的 PR」生成——本仓库是直推 main、不走 PR，
+  实测生成出来只有一行 `Full Changelog` 链接，等于发了条没有说明的 Release。
+  现在提取 `## [x.y.z]` 段落作为正文，并自动附上「上一版…本版」的 compare 链接
+  （上一版由 tag 列表按版本号降序取，不依赖当前 tag 是否已存在）。
 
 ### Notes
 
