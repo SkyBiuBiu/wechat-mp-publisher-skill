@@ -234,8 +234,11 @@ python scripts/render_mermaid.py article.md --theme moyu-green
   → ② 本地 mmdc（`npm i -g @mermaid-js/mermaid-cli`）→ ③ mermaid.ink 在线渲染（图表内容会发给
   该第三方服务，涉密图表加 `--no-remote`）。走到哪一条、为什么没走本地，输出里都会写明。
 - 图表的配色自动取所选主题「设计变量速查表」的主色。
-- **图内字体**：`--font-preset wenkai|serif|sans|rounded`（默认 `system`）。换字必须走本地通道 ——
+- **图内字体**：**默认 `wenkai`（霞鹜文楷）**——图内都是小字号说明文字，楷体比雅黑好认。
+  换别的：`--font-preset system|serif|sans|rounded`。换字必须走本地通道 ——
   mermaid.ink 的服务器上没有你的字体，`font-family` 写什么都没用。
+  默认预设自带降级：本机缺字体文件或缺本地通道时安静退回系统字体并打印 `[i]`；
+  人显式指定的预设不降级，会明确说明为什么不生效。
 - **渲染完一定要看一眼 PNG**：本地编辑器若往 HTML 注入 `data-page-node-id` 这类记账属性，
   会把 mermaid 源码里的 `<br/>` 污染成 `<br data-page-node-id="…">`，它认不出来就会当字面文本
   画在图上。这类污染**不报错、只画错**。
@@ -360,12 +363,14 @@ python scripts/make_assets.py -c work/config.json -o work/assets \
 #### 换字体（封面 + 流程图）
 
 字体预设由 `scripts/fonts.py` 统一管，封面（Pillow 按文件加载）和流程图（浏览器按字体族名加载）
-**从同一份清单取** —— 只换一处会得到"封面换了字、图没换"的半吊子状态。
+**从同一份清单取** —— 同一个名字在两边含义一致。但**默认值刻意不同**：流程图默认 `wenkai`
+（`fonts.DEFAULT_MERMAID_PRESET`，图内是小字号说明文字，楷体更好认），封面默认 `system`
+（大标题字形即视觉，系统字最稳）。想让整套统一，就在 config 里两处写同一个值。
 
 | 预设 | 字体 | 气质 |
 |---|---|---|
-| `system` | 系统黑体（微软雅黑） | 默认，零依赖 |
-| `wenkai` | 霞鹜文楷 LXGW WenKai | 楷体骨架，温润、辨识度高 |
+| `system` | 系统黑体（微软雅黑） | 封面默认，零依赖兜底 |
+| `wenkai` | 霞鹜文楷 LXGW WenKai | **流程图默认**，楷体骨架，温润、辨识度高 |
 | `serif` | 思源宋体（标题）+ 思源黑体（正文） | 衬线，正式厚重 |
 | `sans` | 思源黑体 Noto Sans SC | 现代黑体，小字号最清晰 |
 | `rounded` | MiSans Demibold（标题）+ MiSans Regular（正文） | 圆润科技风，笔画端头圆滑 |
@@ -385,8 +390,9 @@ python scripts/make_assets.py -c work/config.json -o work/assets --font-preset w
 python scripts/render_mermaid.py article.md --theme moyu-green --font-preset wenkai
 ```
 
-也可以在 `config.json` 里定一次，省得每次写参数：封面读 `font.preset`，流程图读
-`mermaid.font_preset`（两处建议填一样的值）。
+也可以在 `config.json` 里定一次，省得每次写参数：封面读 `font.preset`（默认 `system`），
+流程图读 `mermaid.font_preset`（默认 `wenkai`）。两处建议填一样的值 —— 只写一处会得到
+"封面换了字、图没换"（或反过来）的半吊子状态。
 
 **挑字体先看对比图**，别凭文字描述选：
 

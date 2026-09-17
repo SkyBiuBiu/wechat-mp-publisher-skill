@@ -354,7 +354,7 @@ python scripts/publish.py <子命令> [参数]
 | `mermaid.width` | | **兜底**显示宽度，默认 `328`（手机正文内容区宽度，见 `theme_vars.MOBILE_CONTENT_W`）。只在量不到图形原始宽度时用得上 —— 正常每张图的宽度由脚本按"让字号落在正文大小"逐张算 |
 | `mermaid.dir` | | 渲染产物目录，默认 `assets` |
 | `mermaid.local` | | 用本机 Chrome 渲染流程图（默认 `true`；没装 node+playwright 时自动退回在线通道）。换字体必须走本地通道 |
-| `mermaid.font_preset` | | 图内文字字体预设，默认 `system`（也可用命令行 `--font-preset`） |
+| `mermaid.font_preset` | | 图内文字字体预设，**默认 `wenkai`（霞鹜文楷）**（也可用命令行 `--font-preset`）；想要系统黑体要显式写 `system` |
 | `font.preset` | | 封面字体预设，默认 `system`。与 `mermaid.font_preset` 用同一套名字，建议两处填一样 |
 | `article.title` | ✅ | 标题，上限 32 字 |
 | `article.digest` | | 摘要，上限 120 字；留空自动抓正文前 54 字 |

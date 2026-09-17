@@ -91,9 +91,11 @@ PNG_BG = "FFFFFF"
 
 USER_AGENT = "wechat-mp-publisher-skill"
 
-# 图内文字的字体栈。默认沿用系统黑体；--font-preset 换成霞鹜文楷 / 思源宋体等
-# 时，浏览器侧靠 fonts.face_css() 的 @font-face 把字体文件喂进去 —— 在线通道
-# （mermaid.ink）看不到这些文件，所以换字体必须走本地渲染（见 render_local）。
+# 图内文字的字体栈。默认取 fonts.DEFAULT_MERMAID_PRESET（霞鹜文楷），**不是**
+# 系统黑体 —— 图里都是小字号说明文字，楷体在小字号下比雅黑好认。想换回系统字
+# 就写 --font-preset system。任何非 system 的预设都靠 fonts.face_css() 的
+# @font-face 把字体文件喂给浏览器，而在线通道（mermaid.ink）看不到这些文件，
+# 所以换字体必须走本地渲染（见 render_local）。
 DEFAULT_FONT_FAMILY = "PingFang SC,Microsoft YaHei,sans-serif"
 
 # 本地渲染脚本（playwright 驱动本机 Chrome）与它的依赖查找
@@ -549,7 +551,7 @@ def load_config_defaults(cfg_path):
     """从 config.json 读 mermaid / theme 段，作为命令行默认值。"""
     d = {"theme": None, "dir": "assets", "scale": 3, "width": CONTENT_W,
          "remote": True, "font_px": FONT_PX, "local": True,
-         "font_preset": fonts.DEFAULT_PRESET}
+         "font_preset": fonts.DEFAULT_MERMAID_PRESET}
     if not cfg_path or not os.path.isfile(cfg_path):
         return d
     try:
@@ -594,9 +596,10 @@ def main():
     ap.add_argument("--no-size-check", action="store_true",
                     help="跳过可读性体检（省一次请求，也就看不到「字太小」的提示）")
     ap.add_argument("--font-preset", default=None,
-                    help="图内文字字体预设（system/wenkai/serif/sans，默认 {}）。"
-                         "非 system 时会自动走本地渲染 —— 在线通道改不了字形"
-                         .format(fonts.DEFAULT_PRESET))
+                    help="图内文字字体预设（system/wenkai/serif/sans/rounded，默认 {}）。"
+                         "非 system 时会自动走本地渲染 —— 在线通道改不了字形。"
+                         "想要系统黑体就显式写 --font-preset system"
+                         .format(fonts.DEFAULT_MERMAID_PRESET))
     ap.add_argument("--list-fonts", action="store_true", help="列出字体预设后退出")
     ap.add_argument("--mmdc", default=None, help="本地 mmdc 可执行文件路径")
     ap.add_argument("--no-local", action="store_true",
@@ -619,7 +622,8 @@ def main():
         for pid, spec in fonts.PRESETS.items():
             f = fonts.preset_files(pid)
             mark = "OK " if (f["title"] and f["body"]) else "-- "
-            out("  {}{:<8} {}".format(mark, pid, spec["label"]))
+            tag = "   ← 流程图默认" if pid == fonts.DEFAULT_MERMAID_PRESET else ""
+            out("  {}{:<8} {}{}".format(mark, pid, spec["label"], tag))
             out("           title={}".format(os.path.basename(f["title"] or "（缺）")))
             out("           body ={}".format(os.path.basename(f["body"] or "（缺）")))
         out("\n字体查找目录：" + "、".join(fonts.font_dirs()))
@@ -645,19 +649,43 @@ def main():
     }
 
     # ---- 字体：换字形必须本地渲染（在线通道看不到 @font-face 指向的本地文件）
-    preset = args.font_preset or d.get("font_preset") or fonts.DEFAULT_PRESET
+    # `wanted` = 人明确要求过的预设（命令行或 config）；没要求时走
+    # fonts.DEFAULT_MERMAID_PRESET。两者要区别对待：默认值**必须能自己降级** ——
+    # 默认值不该把没装本地通道的用户拖进"配了字体却渲染不出"，那种情况下安静
+    # 退回系统字体才是对的；而人明确点名的预设要坚持并说明为什么会不生效。
+    wanted = args.font_preset or d.get("font_preset")
+    preset = wanted or fonts.DEFAULT_MERMAID_PRESET
     if preset not in fonts.PRESETS:
         die("未登记的字体预设：{}（可选：{}）".format(
             preset, "/".join(fonts.PRESETS)))
     local_on = False if args.no_local else bool(d.get("local", True))
     if preset != "system" and not local_on:
-        out("[!] 字体预设 {} 依赖本地渲染通道，--no-local 已忽略".format(preset))
-        local_on = True
+        if wanted:
+            out("[!] 字体预设 {} 依赖本地渲染通道，--no-local 已忽略".format(preset))
+            local_on = True
+        else:
+            # 人明确关掉了本地渲染就别硬开回来；默认字体安静让位给在线通道
+            out("[i] --no-local 下默认的{}用不上，图内改用系统字体，走在线通道"
+                .format(fonts.PRESETS[preset]["label"]))
+            preset = fonts.DEFAULT_PRESET
     font_family, font_css = None, ""
     if preset != "system":
+        rec_dir = os.path.normpath(
+            os.path.join(os.path.expanduser("~"), ".workbuddy", "fonts"))
         if not fonts.available(preset):
-            out("[!] 字体预设 {} 的文件没配齐，退回 {}".format(
-                preset, fonts.DEFAULT_PRESET))
+            out("[!] 字体预设 {} 的文件没配齐，退回 {} —— 装字体：把 ttf 放进 {} "
+                "或设 WMP_FONT_DIR；`python scripts/fonts.py` 可看每套预设解析到哪个文件"
+                .format(preset, fonts.DEFAULT_PRESET, rec_dir))
+            preset = fonts.DEFAULT_PRESET
+        elif not (local_on and local_ready()):
+            if wanted:
+                out("[!] 本地渲染不可用（{}），改走 mermaid.ink —— 图内字形由对方"
+                    "服务器决定，字体预设 {} 不生效".format(_LOCAL["why"], preset))
+            else:
+                out("[i] 本地渲染不可用（{}），图内默认的{}用不上，改用系统字体。"
+                    "想要它生效：装 node + playwright-core（本机 Chrome 即可，"
+                    "不必再下浏览器）；只想消掉本行提示：--font-preset system"
+                    .format(_LOCAL["why"], fonts.PRESETS[preset]["label"]))
             preset = fonts.DEFAULT_PRESET
         else:
             font_family = fonts.css_stack(preset, "body")
@@ -682,10 +710,12 @@ def main():
         return 0
 
     if opts["local"] and local_ready():
-        out("渲染通道：本地 Chrome（字体预设 {}，图内字形可控）".format(preset))
+        if preset == "system":
+            out("渲染通道：本地 Chrome（图内字体：系统字，未套预设）")
+        else:
+            out("渲染通道：本地 Chrome（字体预设 {}，图内字形可控）".format(preset))
     elif opts["local"]:
-        out("[!] 本地渲染不可用（{}），改走 mermaid.ink —— 图内字形由对方服务器"
-            "决定，--font-preset 不生效".format(_LOCAL["why"]))
+        out("[!] 本地渲染不可用（{}），改走 mermaid.ink".format(_LOCAL["why"]))
 
     base = os.path.dirname(os.path.abspath(args.file))
     out_dir = out_dir_rel if os.path.isabs(out_dir_rel) \

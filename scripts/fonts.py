@@ -18,11 +18,20 @@
 预设（preset）只有"逻辑角色"，不绑死某个文件 —— 缺文件就退回系统字体并在
 stderr 说一句，绝不静默变丑：
 
-    system  系统默认：微软雅黑 / 微软雅黑粗体（现状，零依赖）
-    wenkai  霞鹜文楷 LXGW WenKai：楷体骨架，温润、辨识度高
+    system  系统默认：微软雅黑 / 微软雅黑粗体（零依赖，兜底用）
+    wenkai  霞鹜文楷 LXGW WenKai：楷体骨架，温润、辨识度高（**流程图默认**）
     serif   思源宋体 Noto Serif SC 标题 + 思源黑体 Noto Sans SC 正文
     sans    思源黑体 Noto Sans SC：现代黑体，小字号最清晰
     rounded MiSans：圆润科技风（标题 Demibold / 正文 Regular）
+
+两处默认值**故意不同**：
+
+    DEFAULT_MERMAID_PRESET = "wenkai"  流程图（图内文字）默认走霞鹜文楷
+    DEFAULT_PRESET         = "system"  封面与"字体缺失时的退回目标"
+
+为什么要分开：封面是大字号标题，字形本身承担视觉；流程图里的字是**小字号说明
+文字**，楷体的笔画对比度比雅黑更能看住细字，所以图内默认就上文楷。而退回目标
+必须是最稳的 `system` —— 文楷缺文件时退回文楷等于没退（会死循环到无字体）。
 
 用法：
     python scripts/fonts.py                 # 列出可用预设与命中情况
@@ -66,7 +75,13 @@ PRESETS = {
     },
 }
 
+# 封面默认 + 全局兜底（缺字体时的退回目标，必须是最稳的一套）
 DEFAULT_PRESET = "system"
+
+# 流程图（mermaid 图内文字）默认预设。图内的字是**小字号说明文字**，楷体的
+# 字形在小字号下更好认；封面的大标题仍由 DEFAULT_PRESET 管。改这里就改了
+# "不写任何配置时图里是什么字"——render_mermaid.py 从这里取值，不许另写字面量。
+DEFAULT_MERMAID_PRESET = "wenkai"
 
 # CSS 里的字体族名：带 WMP 前缀，避免和用户系统里同名字体打架
 FAMILY_TPL = "WMP-{preset}-{role}"
@@ -338,7 +353,13 @@ def main():
             continue
         f = preset_files(pid)
         mark = "OK " if (f["title"] and f["body"]) else "-- "
-        print("{}{:<8} {}".format(mark, pid, spec["label"]))
+        tags = []
+        if pid == DEFAULT_MERMAID_PRESET:
+            tags.append("流程图默认")
+        if pid == DEFAULT_PRESET:
+            tags.append("封面默认/兜底")
+        print("{}{:<8} {}{}".format(mark, pid, spec["label"],
+                                    "   ← " + " / ".join(tags) if tags else ""))
         for role in ("title", "body"):
             print("      {:<5} {}".format(role, f[role] or "（缺）"))
 

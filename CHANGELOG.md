@@ -7,6 +7,36 @@
 
 版本号同步保存在根目录 `VERSION` 文件，打 tag 时用 `v<版本号>`（例：`v0.1.0`）。
 
+## [0.9.2] - 2026-09-17
+
+流程图的默认字体从系统黑体换成霞鹜文楷。
+
+### Changed
+
+- **图内文字默认走霞鹜文楷**：新增 `fonts.DEFAULT_MERMAID_PRESET = "wenkai"`，
+  `render_mermaid.py` 从它取值（不再散落字面量）。理由：图里都是**小字号说明文字**，
+  楷体在小字号下的笔画辨识度优于雅黑；封面的大标题仍归 `DEFAULT_PRESET = "system"` 管
+  —— 两处默认值**刻意不同**，想整套统一就在 config 里两处写同一个值。
+- **默认预设自带降级**：本机没字体文件、没有本地渲染通道、或用户传了 `--no-local` 时，
+  默认预设安静退回系统字体并打印一条 `[i]` 说明；**人显式点名**的预设（命令行或 config）
+  不降级，会明确说明为什么字形不生效。顺带修掉一处反直觉行为：`--no-local` 原先会被
+  "换字体必须本地渲染"的逻辑强行忽略，现在只在显式指定字体时才忽略，`--no-local` 本身
+  得到尊重（不再把明确关掉本地渲染的人硬拖回本地通道）。
+- 字体缺失提示补上**装字体的具体路径**（`~/.workbuddy/fonts/` 或 `WMP_FONT_DIR`）与
+  自查命令 `python scripts/fonts.py`。
+
+### Added
+
+- `validate_skill.py` 新增「字体默认值」断言：`DEFAULT_MERMAID_PRESET` 必须登记在
+  `PRESETS` 里，且 `render_mermaid.py` 必须引用它 —— 防默认值又散成字面量。
+- `fonts.py` / `render_mermaid.py --list-fonts` / `make_assets.py --list-fonts` 的输出
+  里标出哪一套是默认（`← 流程图默认` / `← 封面默认`），省得靠记忆分辨。
+
+### Docs
+
+- README / SKILL.md / docs/manual / `config.example.json` 同步两处默认值的差异，
+  并给出"想要整套统一就两处都写"的做法。
+
 ## [0.9.1] - 2026-09-17
 
 0.9.0 交付后的一轮完整自查，把漏改的地方补齐。

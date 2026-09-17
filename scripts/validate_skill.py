@@ -487,6 +487,23 @@ def check_fonts():
             fail("字体接线", "{} 没有 --font-preset 开关".format(name))
 
     rm = read(os.path.join(HERE, "render_mermaid.py"))
+
+    # 流程图默认字体：必须登记在 PRESETS 里，且渲染脚本只能从常量取 ——
+    # 默认值一旦散成字面量，改默认就变成"改一处、漏一处"。
+    dmp = getattr(fonts, "DEFAULT_MERMAID_PRESET", None)
+    if not dmp:
+        fail("字体默认值", "fonts.py 没有 DEFAULT_MERMAID_PRESET ——"
+                            "流程图的默认字体就没有唯一出处了")
+    elif dmp not in fonts.PRESETS:
+        fail("字体默认值", "DEFAULT_MERMAID_PRESET={!r} 不在 PRESETS 里".format(dmp))
+    elif "DEFAULT_MERMAID_PRESET" not in rm:
+        fail("字体默认值", "render_mermaid.py 没引用 fonts.DEFAULT_MERMAID_PRESET ——"
+                            "默认字体又变回散落的字面量了")
+    else:
+        ok("字体默认值", "流程图默认 {}（{}），封面默认 {}（{}）".format(
+            dmp, fonts.PRESETS[dmp]["label"],
+            fonts.DEFAULT_PRESET, fonts.PRESETS[fonts.DEFAULT_PRESET]["label"]))
+
     js = os.path.join(HERE, "mermaid_local.js")
     if not os.path.isfile(js):
         fail("本地渲染通道", "scripts/mermaid_local.js 不在（流程图就只能走 mermaid.ink，"

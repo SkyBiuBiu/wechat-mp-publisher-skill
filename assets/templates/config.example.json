@@ -17,13 +17,13 @@
   "mermaid": {
     "local": true,
     "remote": true,
-    "font_preset": "system",
+    "font_preset": "wenkai",
     "scale": 3,
     "width": 1200,
     "dir": "assets"
   },
 
-  "_font": "字体预设：system(系统黑体) / wenkai(霞鹜文楷) / serif(思源宋体+思源黑体) / sans(思源黑体) / rounded(MiSans 圆润科技风)。字体文件不进分发包，放到 ~/.workbuddy/fonts/ 或设 WMP_FONT_DIR；缺了自动退回系统字体并在 stderr 说明。封面与流程图共用这一套名字，建议两处一致",
+  "_font": "字体预设：system(系统黑体) / wenkai(霞鹜文楷) / serif(思源宋体+思源黑体) / sans(思源黑体) / rounded(MiSans 圆润科技风)。两处默认值不同：流程图 mermaid.font_preset 默认 wenkai（图内是小字号说明文字，楷体更好认）；封面 font.preset 默认 system（大标题沿用系统字）。字体文件不进分发包，放到 ~/.workbuddy/fonts/ 或设 WMP_FONT_DIR；缺了自动退回系统字体并在 stderr 说明。建议两处填一样的值",
   "font": {
     "preset": "system"
   },

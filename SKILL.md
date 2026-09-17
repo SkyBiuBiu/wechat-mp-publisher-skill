@@ -124,7 +124,8 @@ python <skill>/scripts/render_mermaid.py article.md --theme moyu-green
 #   → 产出 article.mermaid.md（围栏已换成 ![](assets/mermaid-N.png)）
 #   → 产出 assets/mermaid-1.png、mermaid-2.png …
 #   通道自动选：本地 Chrome（默认，字体可控且内容不出本机）→ 本地 mmdc → mermaid.ink
-#   想换图内字体：--font-preset wenkai（非 system 时强制走本地通道）
+#   图内字体默认霞鹜文楷（fonts.DEFAULT_MERMAID_PRESET）；换别的：--font-preset serif
+#   想要系统字：--font-preset system（非 system 时必须走本地通道）
 python <skill>/scripts/render_mermaid.py --list-themes      # 查主题标识
 python <skill>/scripts/render_mermaid.py --list-fonts       # 看字体预设解析到哪些文件
 ```
@@ -146,10 +147,13 @@ python <skill>/scripts/render_mermaid.py --list-fonts       # 看字体预设解
 - 出图**强制不透明底**（`bgColor=FFFFFF`）。mermaid.ink 默认返回半透明 PNG，
   而微信点开大图是**黑底查看器**，深色文字压在黑底上等于没画。
 
-**图内字体**：默认 `system`（系统黑体）。想让流程图用别的字形，装好字体文件后加
-`--font-preset wenkai|serif|sans|rounded`（或在 `config.json` 的 `mermaid.font_preset` 里定一次）。
+**图内字体**：**默认霞鹜文楷**（`fonts.DEFAULT_MERMAID_PRESET`，图内都是小字号说明
+文字，楷体比雅黑好认）。想换：装好字体文件后加
+`--font-preset system|serif|sans|rounded`（或在 `config.json` 的 `mermaid.font_preset` 里定一次）。
 **换字必须走本地通道** —— mermaid.ink 的服务器上没有你的字体，写什么 `font-family` 都白搭。
 本地通道 = node + playwright-core + 本机 Chrome（缺哪样都会在输出里说明原因并自动退回在线通道）。
+默认预设**自带降级**：本机没字体文件或没本地通道时，图内安静退回系统字体并打印 `[i]`
+说明（人显式指定的预设则不降级，会明确告诉你为什么不生效）。
 
 **"正文宽度"取手机值 328px，不是桌面网页的 677px。** 328 = 360dp 机型 360 − 两侧留白
 16×2（见 `theme_vars.MOBILE_CONTENT_W`，插图与代码块共用这一个数）。早期版本按 677 算，
@@ -300,11 +304,14 @@ python <skill>/scripts/make_assets.py -c wechat-publish/config.json -o wechat-pu
 不要去改主题库色值**：摸鱼绿与摸鱼票据风主色同为 `#059669`、石墨极简与留白禅意都偏无彩，
 改色值会牵连正文排版。
 
-**字体**：默认跟随系统（微软雅黑）。换字体加 `--font-preset`，或在 `config.json` 的
-`font.preset` 里定一次：`wenkai`（霞鹜文楷，楷体）/ `serif`（思源宋体标题 + 思源黑体正文）/
-`sans`（思源黑体）/ `rounded`（MiSans，圆润科技风）。**封面与流程图共用 `scripts/fonts.py`
-这一份预设清单**，改就两处一起改 ——
-只换一处会得到"封面换了字、图没换"的半吊子状态。字体文件不进分发包：放到
+**字体**：封面默认跟随系统（微软雅黑），流程图默认霞鹜文楷（见 `fonts.DEFAULT_MERMAID_PRESET`）。
+换字体加 `--font-preset`，或在 `config.json` 里定一次（封面读 `font.preset`，图读
+`mermaid.font_preset`）：`wenkai`（霞鹜文楷，楷体）/ `serif`（思源宋体标题 + 思源黑体正文）/
+`sans`（思源黑体）/ `rounded`（MiSans，圆润科技风）。**两边共用 `scripts/fonts.py` 这一份
+预设清单**（同一个名字在两边含义一致，不会出现"封面认这个文件、图认那个族名"），
+但默认值刻意不同：封面是大标题、字形即视觉，保持系统字最稳；图内是小字号说明文字，
+楷体更好认。**想让整套统一，就在 config 里两处都写上同一个值**——只写一处会得到
+"封面换了字、图没换"的半吊子状态。字体文件不进分发包：放到
 `~/.workbuddy/fonts/`（或 `<skill>/assets/fonts/`、`WMP_FONT_DIR`），缺了自动退回系统字体
 并在 stderr 说明，不会崩也不会悄悄变。
 

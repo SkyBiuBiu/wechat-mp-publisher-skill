@@ -491,9 +491,10 @@ def main():
         for pid, spec in fonts.PRESETS.items():
             f = fonts.preset_files(pid)
             mark = "OK " if (f["title"] and f["body"]) else "-- "
-            print("{}{:<8} {}   标题={}  正文={}".format(
+            tag = "   ← 封面默认" if pid == fonts.DEFAULT_PRESET else ""
+            print("{}{:<8} {}   标题={}  正文={}{}".format(
                 mark, pid, spec["label"], os.path.basename(f["title"] or "缺"),
-                os.path.basename(f["body"] or "缺")))
+                os.path.basename(f["body"] or "缺"), tag))
         print("查找目录：" + "、".join(fonts.font_dirs()))
         return
 
