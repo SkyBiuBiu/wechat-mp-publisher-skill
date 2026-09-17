@@ -15,10 +15,10 @@
 （骨架已经按 288px 加固过），不会出现"某个主题的样张在手机上炸了"。
 
 用法：
-    python tools/build_theme_showcase.py --src ../wechat-publish --out ../wechat-publish/showcase
-    python tools/build_theme_showcase.py --src ... --out ... --themes moyu-green,red-white
-    python tools/build_theme_showcase.py --src ... --out ... --push        # 逐版推草稿箱
-    python tools/build_theme_showcase.py --src ... --out ... --no-cover    # 跳过封面（省时间）
+    python scripts/build_theme_showcase.py --src ../wechat-publish --out ../wechat-publish/showcase
+    python scripts/build_theme_showcase.py --src ... --out ... --themes moyu-green,red-white
+    python scripts/build_theme_showcase.py --src ... --out ... --push        # 逐版推草稿箱
+    python scripts/build_theme_showcase.py --src ... --out ... --no-cover    # 跳过封面（省时间）
 
 --src 目录需要含：article.html（基准稿）、article.md（取代码围栏）、config.json（取凭证与文章元信息）。
 """

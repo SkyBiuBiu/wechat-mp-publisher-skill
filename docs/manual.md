@@ -372,8 +372,8 @@ python scripts/highlight_code.py article.md --theme graphite-minimal -o code.htm
 当基准，一次产出六版可直接推送的成稿：
 
 ```bash
-python tools/build_theme_showcase.py --src work --out work/showcase      # 出六版成稿 + 对比页
-python tools/build_theme_showcase.py --src work --out work/showcase --push   # 顺带逐版推草稿箱
+python scripts/build_theme_showcase.py --src work --out work/showcase      # 出六版成稿 + 对比页
+python scripts/build_theme_showcase.py --src work --out work/showcase --push   # 顺带逐版推草稿箱
 ```
 
 产出 `work/showcase/<主题标识>/{article.html, config.json, assets/}`，外加一份

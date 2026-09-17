@@ -7,6 +7,23 @@
 
 版本号同步保存在根目录 `VERSION` 文件，打 tag 时用 `v<版本号>`（例：`v0.1.0`）。
 
+## [0.7.3] - 2026-09-17
+
+修一个**交付缺口**：v0.7.2 的头号新特性 `build_theme_showcase.py` 放在了 `tools/` 下，
+而 `build_zip.py` 的 `EXCLUDE_REL_PREFIXES` 会整目录排除 `tools/` ——
+**从分发包（zip）安装的用户拿不到六主题样张流水线**，只有克隆仓库的人能用。
+而它是面向用户的能力（"所有预设各推一版到草稿箱"是用户的真实诉求），
+不是 `make_theme_previews.py` / `make_code_preview.py` 那类开发辅助。
+
+### Changed
+
+- **`build_theme_showcase.py` 由 `tools/` 移入 `scripts/`** —— 与其它 user-facing
+  脚本同级，现在**随分发包一起发布**。脚本内部的路径解析（`SKILL = dirname(HERE)`
+  + `SKILL/scripts`）在移动后结果一致，无需改动逻辑；仅更新了 docstring 里的用法示例。
+- `tools/` 的定位收窄为"纯开发辅助、需本机 Chrome/playwright、不进分发包"
+  （`make_theme_previews.py` / `make_code_preview.py` / `shot_article.js` /
+  `narrow_screen_check.js`），README 目录树与说明同步对齐。
+
 ## [0.7.2] - 2026-09-17
 
 新增「同一篇文章 × 全部预设」的**主题样张流水线**：一次生成六版可推送的成稿
@@ -16,7 +33,7 @@
 
 ### Added
 
-- **`tools/build_theme_showcase.py`**：以一篇已排好的基准稿（`article.html` +
+- **`scripts/build_theme_showcase.py`**：以一篇已排好的基准稿（`article.html` +
   `article.md` + `config.json`）为输入，输出 `moyu-green / red-white /
   graphite-minimal / zen-whitespace / moyu-ticket / olive-journal` 六版成稿。
   换掉的是**主题身份**而非版式骨架，所以每版都继承基准稿的 288px 窄屏加固：
