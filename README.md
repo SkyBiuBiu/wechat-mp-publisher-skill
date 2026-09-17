@@ -128,6 +128,10 @@
 > 代码块配色怎么看：`python tools/make_code_preview.py` 出一页
 > 「同一段代码 × 六套主题」的对照页（零依赖）。色值表看不出扎不扎眼，得眼睛看；
 > 这也是"自定义主题是否自动适配"的验收口——新主题登记后重跑，它该自动出现在页面里。
+
+> 整篇成稿在六套主题下长什么样：`python tools/build_theme_showcase.py --src <工作目录> --out <输出目录>`
+> ——以一篇排好的稿子为基准，产出六版可直接推送的成稿（mermaid 流程图与代码块
+> 都按各自主题重渲）+ 一份并排对比页；加 `--push` 逐版推草稿箱。
 > 注意 `tools/` 是仓库开发脚本，`build_zip.py` 有意不把它打进分发包，需克隆仓库使用。
 
 ## 安装
@@ -382,8 +386,11 @@ wechat-mp-publisher-skill/
 │   ├── manual.md                   # 完整操作手册：后台路径、白名单排查、报错表
 │   └── images/                     # README 的主题样例配图（不进分发包）
 ├── tools/
-│   └── make_theme_previews.py      # 生成上面的样例配图（需本机 Chrome，不进分发包）
-│   └── make_code_preview.py        # 「同一段代码 × 多套主题」着色对照页（零依赖）
+│   ├── make_theme_previews.py      # 生成上面的样例配图（需本机 Chrome，不进分发包）
+│   ├── make_code_preview.py        # 「同一段代码 × 多套主题」着色对照页（零依赖）
+│   ├── build_theme_showcase.py     # 同一篇成稿 × 全部主题，出六版成稿 + 对比页（可推草稿）
+│   ├── shot_article.js             # 样张目视核对截图（playwright）
+│   └── narrow_screen_check.js      # 十档宽度窄屏回归测量（playwright）
 ├── assets/
 │   ├── preview-template.html       # 预览页外壳（带复制按钮）
 │   ├── sample-article.md           # 演示输入

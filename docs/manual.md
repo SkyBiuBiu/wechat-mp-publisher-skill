@@ -366,6 +366,28 @@ python scripts/highlight_code.py article.md --theme graphite-minimal -o code.htm
 > ⚠️ 新增主题后必须跑 `python scripts/validate_skill.py` —— 组件库存在但没登记到
 > `theme-index.md` 会被判 FAIL。
 
+### 想一次看完「这篇文章在六套主题下长什么样」
+
+选主题靠色值表想象不出来，尤其是流程图配色与代码块明暗。让工具用**一篇已排好的稿子**
+当基准，一次产出六版可直接推送的成稿：
+
+```bash
+python tools/build_theme_showcase.py --src work --out work/showcase      # 出六版成稿 + 对比页
+python tools/build_theme_showcase.py --src work --out work/showcase --push   # 顺带逐版推草稿箱
+```
+
+产出 `work/showcase/<主题标识>/{article.html, config.json, assets/}`，外加一份
+`work/showcase/index.html`（六版并排、按 390px 手机宽渲染）。
+
+它换掉的是**主题身份**、不换版式骨架：配色、圆角倍率、卡片描边与阴影气质
+（票据=硬阴影黑描边 / 禅意·石墨·橄榄=细线无影 / 红白=淡红描边）、字体栈、
+以及**按主题重渲的 mermaid 图与重新着色的代码块**。骨架沿用基准稿，所以每版
+都继承基准稿的窄屏加固，不会出现"某个主题的样张在手机上炸了"。
+
+验证：每版都会自动跑 `validate_gzh_html.py`；要再量一遍宽度用
+`node tools/narrow_screen_check.js <成稿路径>`；想目视核对用
+`node tools/shot_article.js <成稿路径> <输出目录> <前缀>`（截顶部区 / 流程图 / 代码块）。
+
 ---
 
 ## 六、读体检报告
