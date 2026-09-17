@@ -219,10 +219,13 @@ cp <skill>/assets/templates/config.example.json wechat-publish/config.json
 ### Step 3：封面
 
 ```bash
-python <skill>/scripts/make_assets.py --out wechat-publish/assets \
-    --title "文章标题" --subtitle "副标题"
+# 配色跟着 config 的 theme 走；-o 是输出目录
+python <skill>/scripts/make_assets.py -c wechat-publish/config.json -o wechat-publish/assets \
+    --title "文章标题" --subtitle "副标题" --date "2026.09"
 ```
-需 `pillow`。默认出 900×383（微信推荐比例）。`--flow` 还能生成一张流程图占位。
+需 `pillow`。出两张：`cover.png`（900×383，微信推荐比例）和 `diagram.png`（正文插图占位，用不上就删）。
+**配色从主题库 `references/theme-<id>.md` 的「设计变量速查表」解析**（主色调/标题色/正文色/辅助文字/极浅底），
+封面与正文成套。`--theme <id>` 手动指定，`--dark` 回到旧的深色橙调版式。
 
 ### Step 4：发布前体检
 
