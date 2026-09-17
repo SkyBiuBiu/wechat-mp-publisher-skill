@@ -27,16 +27,16 @@ import io
 import json
 import math
 import os
-import re
 import sys
 from PIL import Image, ImageDraw, ImageFont
+
+import theme_vars          # 同目录；主题变量表的唯一解析入口
 
 # 2x 高清倍率：全部坐标与字号按此缩放（设计稿以 1x 为单位）
 S = 2
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 ROOT = os.path.dirname(HERE)
-THEME_DIR = os.path.join(ROOT, "references")
 
 # ---- 内置深色版式（无主题 / --dark 时使用）
 ORANGE = (217, 79, 34)
@@ -49,68 +49,12 @@ DIM = (108, 114, 126)
 
 
 # ---------------------------------------------------------------- 主题配色
-def hex2rgb(h):
-    h = h.lstrip("#")
-    if len(h) == 3:
-        h = "".join(c * 2 for c in h)
-    return tuple(int(h[i:i + 2], 16) for i in (0, 2, 4))
-
-
-def _pick(pairs, wanted, avoid=()):
-    """先精确匹配标签，再前缀匹配（排掉 深/浅/背景 这类派生标签）。"""
-    for w in wanted:
-        for label, val in pairs:
-            if label == w:
-                return val
-    for w in wanted:
-        for label, val in pairs:
-            if label.startswith(w) and not any(a in label for a in avoid):
-                return val
-    return None
-
-
+# 变量表的解析与匹配统一在 theme_vars.py（三个脚本共用一份，见其文件头注释）。
+# 放在这里会出问题：清单里少一个标签，主题就静默退回兜底色 —— 封面会退回
+# 深色版式、插图会串成别的主题的颜色。统一之后改一处三处生效。
 def load_theme(theme_id):
-    """从主题组件库里抽配色。返回 dict 或 None。"""
-    if not theme_id:
-        return None
-    path = os.path.join(THEME_DIR, "theme-{}.md".format(theme_id))
-    if not os.path.isfile(path):
-        return None
-    with io.open(path, encoding="utf-8") as f:
-        text = f.read()
-    m = re.search(r"##\s*设计变量速查表\s*```(.*?)```", text, re.S)
-    block = m.group(1) if m else text[:4000]
-
-    pairs = []
-    for line in block.splitlines():
-        line = line.strip()
-        if "：" not in line:
-            continue
-        label, _, val = line.partition("：")
-        hexes = re.findall(r"#[0-9A-Fa-f]{6}\b|#[0-9A-Fa-f]{3}\b", val)
-        if hexes:
-            pairs.append((label.strip().strip("`"), hexes[0]))
-
-    primary = _pick(pairs, ["主色调", "主色", "主题墨色", "主题色"],
-                    avoid=("深", "浅", "背景", "极"))
-    title = _pick(pairs, ["标题色"], avoid=())
-    body = _pick(pairs, ["次要文字", "次要文字色", "正文色", "正文", "弱化文字"])
-    aux = _pick(pairs, ["辅助文字", "辅助文字色", "弱化文字", "注释/标签",
-                        "标签文字色", "标签色"])
-    light = _pick(pairs, ["极浅灰", "极浅灰底", "米白背景", "底色", "纯白底",
-                          "浅灰背景", "米黄纸感背景"], avoid=("主色调",))
-
-    if not (primary and title):
-        return None
-    return {
-        "id": theme_id,
-        "primary": hex2rgb(primary),
-        "title": hex2rgb(title),
-        "body": hex2rgb(body or title),
-        "aux": hex2rgb(aux or body or title),
-        "light": hex2rgb(light or "#FFFFFF"),
-        "is_light": True,
-    }
+    """从主题组件库抽配色。返回 dict 或 None（取不到就退回内置深色版式）。"""
+    return theme_vars.asset_theme(theme_id)
 
 
 def font(size, bold=False):

@@ -238,9 +238,35 @@ python scripts/render_mermaid.py article.md --theme moyu-green
   画在图上。这类污染**不报错、只画错**。
 - 装配时把这些 PNG 当普通图片，用主题库/通用库的图片组件引用。
 
+**"图看不清"要改方向，不要调大宽度。** mermaid.ink 按请求宽度缩放位图，而位图在正文里
+又被缩放一次，请求宽度被抵消，最后正文里的字号只剩 `图内字号 × 正文宽度 ÷ 图形原始宽度`：
+
+| 图 | 原始宽度 | 正文里字号 | 观感 |
+|---|---|---|---|
+| `flowchart LR` 七节点 | 1389px | 7.8px | 手机上一团灰 |
+| 同图换 `flowchart TD` | 423px | 25.6px | 清楚 |
+
+脚本已自动处理：量出原始宽度后，字号低于 11px 且换方向能好 1.25 倍以上就**自动换方向**
+并在输出里写明 `7.8px → 25.6px`；窄图反过来**收窄显示宽度**（让字号落在 17px 上下，
+免得满宽拉出 40px 巨字 + 两张屏高的图）。出图**强制不透明底** —— mermaid.ink 默认给半透明
+PNG，而微信点开大图是**黑底查看器**，深色文字压在黑底上等于没画。相关开关：`--font-size`、
+`--target-size`、`--keep-direction`、`--no-size-check`。
+
 **代码块不转图片**：用通用库 1a 深色 / 1b 浅色代码块组件，每行一个 `<p style="margin:0">`，
 缩进用全角空格 `　`，**绝不用 `white-space:pre`**。文字可选中，手机上长按代码即可复制
 （公众号剥 `<script>`，JS 复制按钮活不下来，长按复制是唯一可靠路径）。
+
+**代码要按语言着色**，否则超过十行就糊成一片灰。跑脚本，别手写色值：
+
+```bash
+python scripts/highlight_code.py article.md --theme moyu-green -o code.html
+python scripts/highlight_code.py --show-palette --all-themes   # 看各主题配色
+```
+
+配色从主题库的设计变量速查表推导，6 套内置主题与自定义主题都自动适配 —— 关键词/函数取
+主色相的邻居（+0° / +24°），字符串/数字用 +200° 的低饱和暖色，**运算符与标点不着色**。
+着色后的 markup 是"外层带色、内层仍 `<span leaf="">`"，见
+[`references/common-components.md`](../references/common-components.md) 的 1a+/1b+ 节。
 
 更细的标签与样式约束见 [`references/wechat-api-reference.md`](../references/wechat-api-reference.md) 第五节。
 
@@ -300,6 +326,8 @@ python scripts/render_mermaid.py --list-themes
 python scripts/validate_gzh_html.py article.html
 # 4. 重新跑 render_mermaid.py（图表配色跟着主题走）
 python scripts/render_mermaid.py article.md --theme graphite-minimal --in-place
+# 5. 重新跑 highlight_code.py（代码块配色也跟着走）
+python scripts/highlight_code.py article.md --theme graphite-minimal -o code.html
 ```
 
 > 为什么不保留「一键换肤」？因为组件库的价值恰恰在于每套主题的组件是为它的气质专门打磨的

@@ -99,7 +99,7 @@ agent_created: true
 | 章节 / 子章节 | `##` / `###` |
 | 加粗 / 高亮 / 下划线 | `**文字**` / `==文字==` / `<u>文字</u>` 或 `++文字++` |
 | 图片 / GIF | `![说明](URL)`、`![](xxx.gif)` |
-| 代码 / 命令 / Prompt | ` ``` 围栏 ``` `、行内 `` `code` `` |
+| 代码 / 命令 / Prompt | ` ``` 围栏 ``` `、行内 `` `code` `` → **按语言着色须跑 `highlight_code.py`**，见 Step 4 |
 | 表格 / 列表 / 分割线 | `\|` 表格、`- ` / `1. `、`---` |
 | mermaid | ` ```mermaid ` → **必须先跑 `render_mermaid.py` 转 PNG**，见 Step 4 |
 
@@ -126,6 +126,43 @@ python <skill>/scripts/render_mermaid.py article.md --theme moyu-green
 #   本地装了 mmdc 会优先用；没有则走 mermaid.ink（涉密图表加 --no-remote 并装 mmdc）
 python <skill>/scripts/render_mermaid.py --list-themes      # 查主题标识
 ```
+
+**"图看不清"的根因是原始版式宽度，不是位图像素不够。** mermaid.ink 会按请求宽度缩放，
+请求宽度在"位图→正文"这步又被抵消，最终正文里的字号只剩：
+
+```
+正文里实际字号 = 图内字号 × 正文宽度 ÷ 图形原始宽度
+```
+
+所以横排长链（`flowchart LR` 七节点）原始宽 1389px，正文里只剩 7.8px —— 手机上是一团灰。
+**真正的杠杆是换方向或拆图**，不是调大 `--width`。脚本已把这件事自动化：
+
+- 渲染前先量图形原始宽度，正文里字号低于 11px 且换方向能好 1.25 倍以上时，
+  **自动把 `flowchart LR` 改成正交方向**，并在输出里写明 `7.8px → 25.6px`；
+- 窄图（原始宽度本来就小）反过来**收窄显示宽度**，让字号落在正文惯用的 17px 上下，
+  免得满宽拉出一屏 40px 巨字 + 两张屏高；
+- 出图**强制不透明底**（`bgColor=FFFFFF`）。mermaid.ink 默认返回半透明 PNG，
+  而微信点开大图是**黑底查看器**，深色文字压在黑底上等于没画。
+
+要改行为：`--font-size` 图内字号、`--target-size` 期望正文字号、`--keep-direction`
+不自动换方向、`--no-size-check` 跳过体检（省一次请求）。
+
+**代码块按语言着色再装配**：
+
+```bash
+python <skill>/scripts/highlight_code.py article.md --theme moyu-green -o code.html
+#   --lang python 只取该语言；--style light 出通用库 1b 浅色版
+#   --show-palette --all-themes 打印全部主题的高亮配色（排查"颜色突兀"先看这个）
+```
+
+配色**从主题库的设计变量速查表推导**，所以 6 套内置主题和任何自定义主题都自动适配，
+不用为每套主题维护一份高亮配色表。三条约束保证"不突兀"：关键词/函数取主色相的邻居
+（+0° / +24°）；深色底上所有 token 明度锁在 0.73~0.82、饱和度 0.30~0.42，全篇只有
+亮度一致这一种变化；只有字符串/数字用 +200° 的低饱和暖色，**运算符与标点不着色**。
+
+主色若是墨黑或灰（橄榄手记 `#1e1f23`、石墨极简 `#52525B`），色相是舍入噪声，
+脚本自动改取主题登记的点睛强调色的色相（`#ed7b2f` / `#F97316`）——见
+`scripts/theme_vars.py` 的 `chroma()`。
 
 装配时把 `mermaid-N.png` 当普通图片，用主题库/通用库的图片组件引用（不要留 ```mermaid 源码，会当正文发出去）。
 
@@ -276,6 +313,8 @@ python <skill>/scripts/publish.py draft -c wechat-publish/config.json
 |---|---|
 | `render_mermaid.py article.md --theme X` | 排版前把 ```mermaid 渲染成 PNG，产出工作副本 |
 | `render_mermaid.py --list-themes` | 列出已注册主题标识 |
+| `highlight_code.py article.md --theme X` | 代码围栏 → 按语言着色的代码块组件（零依赖） |
+| `highlight_code.py --show-palette --all-themes` | 打印各主题的高亮配色，排查"颜色突兀" |
 | `validate_gzh_html.py <html>` | **产物关**：禁用标签 / `<span leaf>` / 半角标点 |
 | `component_lint.py <skill>` | **源头关**：扫组件库反模式（改过主题库才需要） |
 | `wrap_preview.py <html>` | 生成带「复制到公众号」按钮的预览页 |

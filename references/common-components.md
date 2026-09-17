@@ -47,6 +47,43 @@
 
 （左竖条 `#DC2626` 换成当前主题主色；多行同 1a：每行一个 `<p style="margin:0">`，不用 `white-space:pre`，缩进用全角空格 `　`。）
 
+### 1a+/1b+. 按语言着色（在 1a / 1b 的结构上叠一层 token 颜色）
+
+1a / 1b 的上面两个示例是**单色**的 —— 每行都是同一个字色。代码超过十行就会糊成一片灰，
+读不出结构。给 token 上色只需在原结构上把文本再包一层：**着色包外层、`<span leaf="">` 仍在内层**：
+
+```html
+<p style="margin:0;font-family:'SF Mono',Consolas,Monaco,monospace;font-size:13px;line-height:1.6;color:#E2E8F0;">
+  <span style="color:#A1D9C7;"><span leaf="">for</span></span><span leaf=""> step </span><span style="color:#A1D9C7;"><span leaf="">in</span></span><span leaf=""> </span><span style="color:#9FD1D6;"><span leaf="">range</span></span><span leaf="">(max_steps):</span>
+</p>
+```
+
+**不要手写这些色值**，跑脚本，配色由主题推导：
+
+```bash
+python scripts/highlight_code.py article.md --theme moyu-green -o code.html
+python scripts/highlight_code.py --show-palette --all-themes   # 看各主题的配色
+```
+
+为什么必须由脚本推导：手写必然出现"这套主题用了这个绿、下套主题忘了改"的漂移，而且
+每篇文章都要重新编一遍色值。脚本从主题库的「设计变量速查表」里取色相，6 套内置主题与
+任何自定义主题（见 `theme-generator.md`）都自动适配。
+
+三条"不突兀"的硬约束（改配色时守住）：
+
+1. **同族**：关键词取主色相同色相，函数取主色 +24°，整块代码的主旋律就是主题色本身；
+2. **统一明度**：深色底上所有 token 明度锁在 `L≈0.73~0.82`、饱和度 `0.30~0.42`，
+   全篇只有"亮度一致"这一种变化，不会出现某个 token 扎眼；
+3. **只留一个暖色**：字符串/数字用主色 +200°（近似互补）的低饱和暖色，全文仅此一处
+   对比色。**运算符与标点不着色**，避免满屏彩点。
+
+支持 python / bash / json / javascript / yaml / sql / dockerfile 及 C 系语言（go/rust/java…），
+其余标识按 C 系处理，`text`/`prompt`/`md` 等不着色。浅色主题用 `--style light` 出 1b 版。
+
+> 主色是墨黑或灰的主题（橄榄手记 `#1e1f23`、石墨极简 `#52525B`）色相不可信，脚本会自动
+> 改取主题登记的点睛强调色（`#ed7b2f` / `#F97316`）的色相。判据是通道差而非 HSL 饱和度：
+> `#1e1f23` 的 HSL 饱和度有 0.077 看着"有一点彩"，实际通道差只有 5/255，纯属舍入噪声。
+
 ### 1c. 行内代码（正文中的 `code` 短片段）
 
 ```html

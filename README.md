@@ -62,7 +62,8 @@
 ### 发布侧
 
 - **正文图片自动换链**：正文写 `<img src="assets/xx.png">` 本地相对路径，脚本先传微信图床再替换 `src`。外链图会被微信静默过滤，别用。
-- **mermaid 高清渲染**：`render_mermaid.py` 把 ```mermaid 围栏渲染成 PNG（本地 mmdc 优先，mermaid.ink 兜底），默认 `scale=3`，手机上看不糊。
+- **mermaid 高清渲染**：`render_mermaid.py` 把 ```mermaid 围栏渲染成 PNG（本地 mmdc 优先，mermaid.ink 兜底），默认 `scale=3`，手机上看不糊。它还量出图形的**原始版式宽度**，推算这张图发出去在正文里究竟是多大的字：`LR` 长链在手机上只剩 7.8px 时会**自动换方向**（`7.8px → 25.6px`），窄图则**收窄显示宽度**免得拉出一屏巨字；出图一律**不透明底**（mermaid.ink 默认半透明，而微信点开大图是黑底查看器，深色文字会糊掉）。
+- **代码按语言着色**：`highlight_code.py` 把代码围栏转成带 token 颜色的代码块组件，配色**从主题库推导**（关键词/函数取主色相 ±24°，字符串数字用 +200° 低饱和暖色，运算符标点不着色，深色底上所有 token 明度锁在 0.73~0.82）。6 套内置主题与自定义主题都自动适配，不必逐主题维护配色表。见 [`references/common-components.md`](references/common-components.md) 的 1a+/1b+ 节。
 - **发布前体检**：`preflight.py` 在本地把接口侧会翻车的地方拦掉——标题 32 字、作者 16 字、摘要 120 字、正文 1MB、图片体积格式、外链图、残留围栏与 mermaid 源码。分 P0 阻断 / P1 警告 / P2 建议三级，每条都给处理办法。
   （「正文 2 万字符」是文档口径，**2026-09-17 实测未强制**：4.5 万字符被接受且完整落库，所以只提示不阻断。）
 - **零第三方依赖**：全部脚本只用 Python 标准库（`make_assets.py` 需 pillow），Windows / Linux 通用。
@@ -176,6 +177,11 @@ python scripts/render_mermaid.py --list-themes            # 看六套主题标�
 # 3. mermaid 先渲染成 PNG（正文里有 ```mermaid 才需要）
 python scripts/render_mermaid.py article.md --theme moyu-green
 #    → 产出 article.mermaid.md 与 assets/mermaid-*.png
+#    → 顺带报出每张图在正文里的实际字号，偏小会自动换方向
+
+# 3b. 代码块按语言着色（正文里有 ``` 围栏才需要）
+python scripts/highlight_code.py article.md --theme moyu-green -o work/code.html
+#    → 配色从主题库推导，六套主题与自定义主题通用
 
 # 4. 按组件库装配 work/article.html（纯 <section> 片段，内联样式 + <span leaf>）
 
@@ -297,7 +303,9 @@ python scripts/publish.py <子命令> [参数]
 
 | 脚本 | 作用 |
 |---|---|
-| `scripts/render_mermaid.py` | 排版前把 ```mermaid 渲染成 PNG。`--theme` 取主题配色，`--list-themes` 查标识，`--no-remote` 禁用在线渲染 |
+| `scripts/render_mermaid.py` | 排版前把 ```mermaid 渲染成 PNG。`--theme` 取主题配色，`--list-themes` 查标识，`--no-remote` 禁用在线渲染；量出原始宽度后**自动换方向 / 收窄显示宽度**，`--font-size` / `--target-size` / `--keep-direction` / `--no-size-check` 可调 |
+| `scripts/highlight_code.py` | 代码围栏 → **按语言着色**的代码块组件。配色从主题库推导，6 套内置主题与自定义主题通用；`--lang` 取单一语言，`--style light` 出浅色版，`--show-palette --all-themes` 打印各主题配色 |
+| `scripts/theme_vars.py` | 主题「设计变量速查表」的**唯一解析入口**（上面两个脚本共用）。按消费者分别声明字段表，支持 3/6 位十六进制，取不到的字段报 `missing` 而非静默兜底 |
 | `scripts/validate_gzh_html.py` | **产物关**：禁用标签 / `<span leaf>` 包裹 / 半角标点 |
 | `scripts/component_lint.py` | **源头关**：扫组件库反模式（`white-space:pre`、正文虚线框、平台禁用项） |
 | `scripts/wrap_preview.py` | 生成带「复制到公众号」按钮的预览页 |
@@ -319,8 +327,8 @@ python scripts/publish.py <子命令> [参数]
 | `author` | | 作者，上限 16 字 |
 | `theme` | | 排版用的主题标识（`moyu-green` / `red-white` / `graphite-minimal` / `zen-whitespace` / `moyu-ticket` / `olive-journal`）。纯记录 + 给 mermaid 取色用；排版本身由组件库决定 |
 | `mermaid.remote` | | mermaid 渲染走 mermaid.ink 在线服务（默认 `true`）；涉密图表装 mmdc 后设 `false` |
-| `mermaid.scale` | | 渲染倍率，默认 `3`（与 width 共同决定输出像素，越高越清晰） |
-| `mermaid.width` | | 渲染基准宽度，默认 `1200`（输出宽 ≈ scale × width） |
+| `mermaid.scale` | | 渲染倍率，默认 `3`（输出像素 ≈ scale × 该图的显示宽度，越高越清晰） |
+| `mermaid.width` | | **兜底**显示宽度，默认 `677`（微信正文内容区宽度）。只在量不到图形原始宽度时用得上 —— 正常每张图的宽度由脚本按"让字号落在正文大小"逐张算 |
 | `mermaid.dir` | | 渲染产物目录，默认 `assets` |
 | `article.title` | ✅ | 标题，上限 32 字 |
 | `article.digest` | | 摘要，上限 120 字；留空自动抓正文前 54 字 |
@@ -346,7 +354,9 @@ wechat-mp-publisher-skill/
 ├── scripts/
 │   ├── publish.py                  # 发布主脚本：微信 API 全链路（零依赖）
 │   ├── preflight.py                # 发布前体检：接口侧硬约束
-│   ├── render_mermaid.py           # mermaid → PNG 预渲染
+│   ├── render_mermaid.py           # mermaid → PNG 预渲染（含可读性体检与自动换方向）
+│   ├── highlight_code.py           # 代码围栏 → 按语言着色的代码块
+│   ├── theme_vars.py               # 主题变量表的唯一解析入口（上面两个共用）
 │   ├── make_assets.py              # 封面生成（需 pillow）
 │   ├── watch_ip.py                 # 白名单生效轮询
 │   ├── validate_gzh_html.py        # 产物关（上游）
@@ -385,9 +395,15 @@ wechat-mp-publisher-skill/
 
 **粘贴到公众号后样式全丢** —— 漏了 `<span leaf="">` 包裹。跑 `validate_gzh_html.py` 定位具体位置。
 
+**代码块是一片灰，看不出语法** —— 用的是单色的 1a/1b 基础结构，没叠 token 颜色。跑 `highlight_code.py` 生成着色版（它会在原结构外面再包一层 `<span style="color:…">`，`<span leaf="">` 仍在内层）。觉得某个 token 扎眼就先 `--show-palette --all-themes` 看配色，再调 `highlight_code.py` 里的明度/饱和度常量。
+
 **正文图片不显示** —— 用了外链图。改成 `<img src="assets/xx.png">` 本地相对路径，脚本会自动换链。
 
 **mermaid 图里印出了 `<br data-page-node-id="…">`** —— 本地编辑器注入的记账属性污染了 mermaid 源码，它会把 `<br/>` 当字面文本画出来。这类污染**不报错、只画错**，渲染完一定要看一眼 PNG。
+
+**发出去的图，字小得看不清** —— 别去调大 `--width`，那是位图像素，放大后字还是那么多。真正决定观感的是**图形原始版式宽度**：正文里字号 = 图内字号 × 正文宽度 ÷ 原始宽度。`flowchart LR` 的七节点长链原始宽 1389px，正文里只剩 7.8px。改法是**换方向**（`LR`→`TD`，同样内容变 423px → 25.6px）、**拆成两张**、或**缩短节点文字**。脚本已经会自动换方向，输出里会写 `7.8px → 25.6px`；如果连换方向都救不回来，它会直接列出哪张图偏小。
+
+**点开大图后图里的字不见了** —— mermaid.ink 默认返回半透明 PNG，而微信点开大图是**黑底查看器**，深色文字压在黑底上等于没画。脚本已强制加 `bgColor=FFFFFF`；自己出图时记得给实色底。
 
 **提示正文超过 2 万字符（WX022）** —— 先别急着删内容：这条**只是提示，不阻断**。官方文档写 `content` 必须少于 2 万字符，但 2026-09-17 实测 45258 字符被 `draft/add` 接受、`draft/get` 回查 45390 字符且尾部一致，即完整落库未截断。主题组件库的内联样式写法体积天然是纯文本的 5~10 倍，压到 2 万以下等于放弃版式，所以照发即可。真被接口回字数错误时再压：mermaid 转 PNG、长表格重排、按章节拆成系列。
 
@@ -439,7 +455,7 @@ git push origin main
 
 本仓库分两部分：
 
-- **本仓库自有部分**（发布链路：`scripts/publish.py`、`preflight.py`、`render_mermaid.py`、`make_assets.py`、`watch_ip.py`、`validate_skill.py`、`build_zip.py`、`tools/`、`docs/`、`references/wechat-api-reference.md`）—— [MIT](LICENSE) © 2026 Sky (SkyBiuBiu)
+- **本仓库自有部分**（发布链路：`scripts/publish.py`、`preflight.py`、`render_mermaid.py`、`highlight_code.py`、`theme_vars.py`、`make_assets.py`、`watch_ip.py`、`validate_skill.py`、`build_zip.py`、`tools/`、`docs/`、`references/wechat-api-reference.md`）—— [MIT](LICENSE) © 2026 Sky (SkyBiuBiu)
 - **排版链路**（`references/theme-*.md`、`common-components.md`、`theme-generator.md`、`format-normalize.md`、`eval-cases.md`、`theme-index.md`、`assets/preview-template.html`、`assets/sample-article.md`、`scripts/validate_gzh_html.py`、`component_lint.py`、`wrap_preview.py`、`extract_docx.py`）—— 来自 [**isjiamu/gzh-design-skill**](https://github.com/isjiamu/gzh-design-skill)，原创 **甲木 × 摸鱼小李**，授权 **AGPL-3.0**，原文见 [`LICENSE-gzh-design`](LICENSE-gzh-design)。
 
 > 排版链路的署名与授权声明**不得删除**；这部分内容的修改版、Fork、二次分发须以 AGPL-3.0（或兼容协议）公开发布，即使只作为网络服务提供也要开源。
