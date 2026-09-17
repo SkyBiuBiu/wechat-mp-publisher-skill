@@ -303,7 +303,7 @@ python scripts/publish.py <子命令> [参数]
 | `publish` | 建草稿并立即正式发布。粉丝会收到推送，不可撤回 |
 | `publish --media-id <id> -y` | 发布草稿箱里已有的一篇，不重复建稿 |
 | `list` / `list --full` | 列出草稿箱（`--full` 出完整 media_id） |
-| `delete --media-id <id> -y` | 删除指定草稿（破坏性，必须显式给 id） |
+| `delete --media-id <id> -y` | 删除指定草稿（破坏性，必须显式给 id）。`-y` 在脚本/非交互环境里必须加，否则会等 stdin 确认而抛 `EOFError` |
 | `token -f` | 强制刷新 access_token（遇到 `40001` 时用） |
 
 通用参数：

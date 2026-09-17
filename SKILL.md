@@ -394,7 +394,7 @@ python <skill>/scripts/publish.py draft -c wechat-publish/config.json
 | `publish.py publish` | 建草稿并立即发布 |
 | `publish.py publish --media-id XXX -y` | 发布草稿箱里已有的一篇 |
 | `publish.py list` / `--full` | 列草稿箱（`--full` 出完整 media_id） |
-| `publish.py delete --media-id XXX -y` | 删除指定草稿（破坏性，需显式给 id） |
+| `publish.py delete --media-id XXX -y` | 删除指定草稿（破坏性，需显式给 id）。**`-y` 在脚本/非交互环境里必须加** —— 不加会等 stdin 确认，非 tty 下直接抛 `EOFError`。批量清理：`list --full` 取完整 id 后逐个 `delete -y` |
 | `publish.py token -f` | 强制刷新 access_token（遇 40001 时用） |
 | `watch_ip.py --draft` | 轮询等白名单生效，通了自动建草稿 |
 | `make_assets.py` | 生成封面（需 pillow）；文案读 `config.cover`，`--motif ring` 加环形意象 |
