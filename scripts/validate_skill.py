@@ -10,7 +10,9 @@
   4. 所有 Python 脚本能否通过语法编译
   5. 是否存在泄露的密钥（AppID / AppSecret 形态）
   6. SKILL.md 中引用的仓库内相对路径是否真实存在
-  7. 风格预设是否与文件名、token 字典、模板占位符三方一致
+  7. 主题注册表（references/theme-index.md）与主题组件库文件是否一一对应
+  8. 组件库源头无反模式（复用 component_lint.py —— 可验证循环的第一关）
+  9. 上游（gzh-design-skill, AGPL-3.0）署名与授权文件是否在位
 
 退出码：0 = 全部通过，1 = 存在 FAIL。
 
@@ -19,46 +21,63 @@
     python scripts/validate_skill.py --quiet     # 只输出问题
 """
 
-import glob
 import io
-import json
 import os
 import re
 import sys
 
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+HERE = os.path.dirname(os.path.abspath(__file__))
+
+if HERE not in sys.path:
+    sys.path.insert(0, HERE)
 
 # ---- 技能必需文件（相对仓库根） ----------------------------------------------
+THEMES = [
+    "moyu-green", "red-white", "graphite-minimal",
+    "zen-whitespace", "moyu-ticket", "olive-journal",
+]
+
 REQUIRED = [
     "SKILL.md",
     "README.md",
     "LICENSE",
+    "LICENSE-gzh-design",
     "VERSION",
     "CHANGELOG.md",
-    "scripts/publish.py",
-    "scripts/preflight.py",
-    "scripts/enhance_content.py",
-    "scripts/apply_style.py",
-    "scripts/watch_ip.py",
-    "scripts/make_assets.py",
+    # 脚本层
+    "scripts/publish.py",           # 发布链路（微信 API）
+    "scripts/preflight.py",         # 接口侧硬约束体检
+    "scripts/render_mermaid.py",    # 排版前的 mermaid 预渲染
+    "scripts/make_assets.py",       # 封面生成
+    "scripts/watch_ip.py",          # IP 白名单监听
+    "scripts/build_zip.py",         # 打包
+    "scripts/validate_skill.py",    # 本文件
+    # 排版层（上游 gzh-design-skill，原样搬运）
+    "scripts/validate_gzh_html.py",  # 产物关
+    "scripts/component_lint.py",     # 源头关
+    "scripts/wrap_preview.py",       # 一键复制预览页
+    "scripts/extract_docx.py",       # docx → markdown
+    "references/theme-index.md",
+    "references/common-components.md",
+    "references/theme-generator.md",
+    "references/format-normalize.md",
+    "references/eval-cases.md",
     "references/wechat-api-reference.md",
+    "assets/preview-template.html",
+    "assets/sample-article.md",
+    "assets/templates/config.example.json",
+] + ["references/theme-{}.md".format(t) for t in THEMES]
+
+# ---- 已删除的旧链路资产：留在这里是防止有人"顺手加回来" ----------------------
+RETIRED = [
+    "assets/styles",
+    "scripts/apply_style.py",
+    "scripts/enhance_content.py",
     "references/style-presets.md",
     "assets/templates/article.html",
     "assets/templates/article.template.html",
-    "assets/templates/config.example.json",
 ]
-
-# ---- 风格预设：至少要有一条，且字段齐全 --------------------------------------
-STYLE_TOKEN_KEYS = {
-    "primary", "primary_soft", "text", "text_strong", "muted", "border",
-    "card_bg", "code_bg", "code_text", "table_head_bg", "table_head_text",
-    "font_size", "line_height", "letter_spacing", "radius", "para_margin",
-    "heading_size",
-}
-
-# 预设允许出现的顶层键 —— 只有视觉与元信息。写作约束、文章结构一律不进预设：
-# 同一套配色可以用在任何题材、任何结构上，把内容规则写进预设等于把它锁死。
-PRESET_KEYS = {"_说明", "id", "name", "tagline", "best_for", "tokens", "code_highlight"}
 
 # ---- 扫描时跳过的目录 --------------------------------------------------------
 SKIP_DIRS = {
@@ -66,24 +85,26 @@ SKIP_DIRS = {
     ".pytest_cache", ".mypy_cache", ".ruff_cache", "tmp", "sandbox",
 }
 
-# ---- 密钥扫描：这些文件允许出现占位值 ----------------------------------------
+# ---- 密钥扫描 -----------------------------------------------------------------
 SECRET_SCAN_SKIP = {"config.example.json"}
-# .gitignore 已忽略的运行时产物：access_token 缓存。它不是仓库内容，且必然含
-# AppID（微信返回体里的原始字段），扫它只会让自检恒红。
 SECRET_SCAN_SKIP_RE = re.compile(r"^\.token_cache.*\.json$")
-SECRET_SCAN_EXTS = {".py", ".json", ".md", ".yml", ".yaml", ".html", ".txt", ".sh", ".ps1", ".bat", ""}
+SECRET_SCAN_EXTS = {".py", ".json", ".md", ".yml", ".yaml", ".html", ".txt",
+                    ".sh", ".ps1", ".bat", ""}
 
 APPID_RE = re.compile(r"\bwx[0-9a-fA-F]{16}\b")
 APPSECRET_RE = re.compile(r"\b[0-9a-fA-F]{32}\b")
 
+
 def is_placeholder(val):
-    """判断是否为占位/演示值：wx0000...（AppID 骨架）或全 0（AppSecret 骨架）。"""
+    """占位/演示值：wx0000...（AppID 骨架）或全 0（AppSecret 骨架）。"""
     core = val[2:] if val.lower().startswith("wx") else val
     return len(set(core.lower())) <= 1
 
-# SKILL.md 中被视为「仓库内资源」的引用前缀
-RESOURCE_PREFIXES = ("scripts/", "references/", "assets/templates/")
-RESOURCE_RE = re.compile(r"`([A-Za-z0-9_./-]+\.(?:py|md|json|html|png|jpg|txt|yml|yaml))`")
+
+RESOURCE_PREFIXES = ("scripts/", "references/", "assets/")
+RESOURCE_RE = re.compile(r"`([A-Za-z0-9_./{}-]+\.(?:py|md|json|html|png|jpg|txt|yml|yaml|docx|pdf))`")
+# 文档里的示意路径（assets/xx.png、mermaid-N.png 之类）不是真实引用，跳过
+PLACEHOLDER_PATH_RE = re.compile(r"(x{2,}|-N\.|\{|\bmy-|\b示例|\bsample_)", re.I)
 
 SEMVER_RE = re.compile(r"^\d+\.\d+\.\d+$")
 
@@ -103,12 +124,11 @@ def warn(title, detail=""):
 
 
 def read(path):
-    with io.open(path, encoding="utf-8") as f:
+    with io.open(path, encoding="utf-8", errors="replace") as f:
         return f.read()
 
 
 def walk_files():
-    """遍历仓库内文件，跳过忽略目录。"""
     for dirpath, dirnames, filenames in os.walk(ROOT):
         dirnames[:] = [d for d in dirnames if d not in SKIP_DIRS]
         for name in filenames:
@@ -122,6 +142,13 @@ def check_required():
         fail("必需文件齐全", "缺失：" + "、".join(missing))
     else:
         ok("必需文件齐全", "{} 个".format(len(REQUIRED)))
+
+    leftover = [p for p in RETIRED if os.path.exists(os.path.join(ROOT, p))]
+    if leftover:
+        fail("旧链路资产已清退",
+             "这些文件属于已被推翻的旧排版/校验链路，不该再出现：" + "、".join(leftover))
+    else:
+        ok("旧链路资产已清退", "{} 项".format(len(RETIRED)))
 
 
 # ---- 2. SKILL.md frontmatter -------------------------------------------------
@@ -140,15 +167,13 @@ def check_frontmatter():
         fail("SKILL.md frontmatter", "frontmatter 未正确闭合")
         return
 
-    block = m.group(1)
     fields = {}
-    for line in block.splitlines():
+    for line in m.group(1).splitlines():
         line = line.strip()
-        if not line or line.startswith("#"):
+        if not line or line.startswith("#") or ":" not in line:
             continue
-        if ":" in line:
-            k, v = line.split(":", 1)
-            fields[k.strip()] = v.strip()
+        k, v = line.split(":", 1)
+        fields[k.strip()] = v.strip()
 
     problems = []
     if not fields.get("name"):
@@ -167,7 +192,8 @@ def check_frontmatter():
     if problems:
         fail("SKILL.md frontmatter", "；".join(problems))
     else:
-        ok("SKILL.md frontmatter", "name={} / description {} 字".format(fields["name"], len(desc)))
+        ok("SKILL.md frontmatter",
+           "name={} / description {} 字".format(fields["name"], len(desc)))
 
 
 # ---- 3. 版本一致性 -----------------------------------------------------------
@@ -181,18 +207,15 @@ def check_version():
         return
 
     cpath = os.path.join(ROOT, "CHANGELOG.md")
-    if os.path.isfile(cpath):
-        ctext = read(cpath)
-        if "[{}]".format(version) not in ctext:
-            fail("版本一致性", "CHANGELOG.md 中没有 [{}] 条目".format(version))
-            return
+    if os.path.isfile(cpath) and "[{}]".format(version) not in read(cpath):
+        fail("版本一致性", "CHANGELOG.md 中没有 [{}] 条目".format(version))
+        return
     ok("版本一致性", "v{} 与 CHANGELOG 一致".format(version))
 
 
 # ---- 4. Python 语法 ----------------------------------------------------------
 def check_python_syntax():
-    bad = []
-    count = 0
+    bad, count = [], 0
     for path in walk_files():
         if not path.endswith(".py"):
             continue
@@ -201,7 +224,7 @@ def check_python_syntax():
             compile(read(path), path, "exec")
         except SyntaxError as e:
             bad.append("{}:{} {}".format(os.path.relpath(path, ROOT), e.lineno, e.msg))
-        except Exception as e:  # 编码错误等
+        except Exception as e:                       # noqa: BLE001
             bad.append("{}: {}".format(os.path.relpath(path, ROOT), e))
 
     if bad:
@@ -212,17 +235,13 @@ def check_python_syntax():
 
 # ---- 5. 密钥扫描 -------------------------------------------------------------
 def check_secrets():
-    hits = []
-    checked = 0
+    hits, checked = [], 0
     for path in walk_files():
         name = os.path.basename(path)
-        if name in SECRET_SCAN_SKIP:
-            continue
-        if SECRET_SCAN_SKIP_RE.match(name):
+        if name in SECRET_SCAN_SKIP or SECRET_SCAN_SKIP_RE.match(name):
             continue
         if os.path.splitext(name)[1].lower() not in SECRET_SCAN_EXTS:
             continue
-        # 跳过本文件自身（里面的正则会自匹配）
         if os.path.abspath(path) == os.path.abspath(__file__):
             continue
         checked += 1
@@ -238,7 +257,6 @@ def check_secrets():
                     val = m.group(0)
                     if is_placeholder(val):
                         continue
-                    # 文档中的示例明示（如 wx 开头 18 位 的描述行）
                     if "示例" in line or "形如" in line or "例如" in line:
                         continue
                     hits.append("{}:{} {} {}".format(rel, i, label, val[:8] + "…"))
@@ -249,91 +267,124 @@ def check_secrets():
         ok("密钥扫描", "{} 个文件无泄露".format(checked))
 
 
-# ---- 6. SKILL.md 引用路径 ----------------------------------------------------
+# ---- 6. 文档引用路径 ---------------------------------------------------------
 def check_references():
-    path = os.path.join(ROOT, "SKILL.md")
-    if not os.path.isfile(path):
-        return
-    text = read(path)
-    refs = set()
-    for m in RESOURCE_RE.finditer(text):
-        ref = m.group(1)
-        if ref.startswith(RESOURCE_PREFIXES):
-            refs.add(ref)
-
-    missing = sorted(r for r in refs if not os.path.exists(os.path.join(ROOT, r)))
-    if missing:
-        fail("SKILL.md 引用路径", "指向不存在的文件：" + "、".join(missing))
-    else:
-        ok("SKILL.md 引用路径", "{} 处引用全部有效".format(len(refs)))
-
-
-# ---- 7. 风格预设 -------------------------------------------------------------
-def check_styles():
-    """预设要与文件名、token 字典、模板占位符三方对齐，否则渲染会报错或静默漏色。"""
-    sdir = os.path.join(ROOT, "assets", "styles")
-    if not os.path.isdir(sdir):
-        fail("风格预设", "assets/styles/ 目录不存在")
-        return
-    files = sorted(glob.glob(os.path.join(sdir, "*.json")))
-    if not files:
-        fail("风格预设", "assets/styles/ 下没有任何预设")
-        return
-
-    problems = []
-    for path in files:
-        name = os.path.splitext(os.path.basename(path))[0]
-        try:
-            data = json.loads(read(path))
-        except ValueError as e:
-            problems.append("{} 不是合法 JSON：{}".format(name, e))
+    missing_all = []
+    total = 0
+    for name in ("SKILL.md", "README.md", "docs/manual.md"):
+        path = os.path.join(ROOT, name)
+        if not os.path.isfile(path):
             continue
-        if data.get("id") != name:
-            problems.append("{} 的 id 字段是「{}」，与文件名不一致".format(
-                name, data.get("id")))
-        missing = sorted(STYLE_TOKEN_KEYS - set((data.get("tokens") or {}).keys()))
-        if missing:
-            problems.append("{} 缺 token：{}".format(name, "、".join(missing)))
-        if "writing" in data:
-            problems.append("{} 含 writing 段 —— 预设只定义视觉（配色 / 字号 / 间距 / "
-                            "代码高亮），文章写什么、分几节、怎么收尾由正文决定".format(name))
-        extra = sorted(set(data) - PRESET_KEYS)
-        if extra:
-            problems.append("{} 有未识别的顶层键：{}".format(name, "、".join(extra)))
+        refs = set()
+        for m in RESOURCE_RE.finditer(read(path)):
+            ref = m.group(1)
+            if not ref.startswith(RESOURCE_PREFIXES):
+                continue
+            if "{" in ref or PLACEHOLDER_PATH_RE.search(ref):
+                continue          # 示意路径，不是真实引用
+            refs.add(ref)
+        total += len(refs)
+        missing_all += ["{} → {}".format(name, r) for r in sorted(refs)
+                        if not os.path.exists(os.path.join(ROOT, r))]
 
-    tpl = os.path.join(ROOT, "assets", "templates", "article.template.html")
-    if os.path.isfile(tpl):
-        body = re.sub(r"<!--.*?-->", "", read(tpl), flags=re.S)
-        ph = set(re.findall(r"\{\{\s*([A-Za-z_][A-Za-z0-9_]*)\s*\}\}", body))
-        unknown = sorted(ph - STYLE_TOKEN_KEYS)
-        unused = sorted(STYLE_TOKEN_KEYS - ph)
-        if unknown:
-            problems.append("模板用了未定义的占位符：" + "、".join(unknown))
-        if unused:
-            problems.append("token 没被模板用到：" + "、".join(unused))
+    if missing_all:
+        fail("文档引用路径", "指向不存在的文件：" + "、".join(missing_all))
     else:
-        problems.append("缺少 assets/templates/article.template.html")
+        ok("文档引用路径", "{} 处引用全部有效".format(total))
 
-    if problems:
-        fail("风格预设", "；".join(problems))
+
+# ---- 7. 主题注册表一致性 -----------------------------------------------------
+def check_themes():
+    index = os.path.join(ROOT, "references", "theme-index.md")
+    if not os.path.isfile(index):
+        return
+    text = read(index)
+    # theme-index.md 自己会引用 theme-generator.md，那不算一套主题
+    registered = set(re.findall(r"theme-([A-Za-z0-9_-]+)\.md", text)) - {"generator"}
+
+    missing = sorted(t for t in registered
+                     if not os.path.isfile(os.path.join(
+                         ROOT, "references", "theme-{}.md".format(t))))
+    unregistered = sorted(t for t in THEMES if t not in registered)
+    if missing:
+        fail("主题注册表", "注册了但组件库不存在：" + "、".join(missing))
+        return
+    if unregistered:
+        fail("主题注册表", "组件库存在但未登记到 theme-index.md：" + "、".join(unregistered))
+        return
+    ok("主题注册表", "{} 套主题与组件库一一对应".format(len(registered)))
+
+
+# ---- 8. 组件库源头关（复用 component_lint.py） --------------------------------
+def check_component_lint():
+    try:
+        import component_lint
+    except ImportError as e:
+        fail("组件库源头关", "无法加载 component_lint.py：{}".format(e))
+        return
+
+    import glob
+    refs = sorted(glob.glob(os.path.join(ROOT, "references", "*.md")))
+    if not refs:
+        fail("组件库源头关", "references/ 下没有 .md")
+        return
+
+    total_err, total_warn, clean, details = 0, 0, 0, []
+    for path in refs:
+        name, found = component_lint.lint_file(path)
+        if not found:
+            clean += 1
+            continue
+        errs = [m for lv, m in found if lv == "ERROR"]
+        warns = [m for lv, m in found if lv == "WARN"]
+        total_err += len(errs)
+        total_warn += len(warns)
+        for m in errs:
+            details.append("{}: {}".format(name, m))
+
+    if total_err:
+        fail("组件库源头关", "ERROR×{} —— {}".format(total_err, "；".join(details[:4])))
+    elif total_warn:
+        warn("组件库源头关", "{} 个库干净；WARN×{} 为上游主题特征用的虚线框"
+             "（摸鱼绿 quote-box / 橄榄手记），属 SKILL.md 已声明的例外"
+             .format(clean, total_warn))
     else:
-        ok("风格预设", "{} 条，与 token 字典、模板占位符三方一致".format(len(files)))
+        ok("组件库源头关", "{} 个库全部无反模式".format(len(refs)))
+
+
+# ---- 9. 上游署名 -------------------------------------------------------------
+def check_upstream():
+    lic = os.path.join(ROOT, "LICENSE-gzh-design")
+    if not os.path.isfile(lic):
+        fail("上游署名", "缺少 LICENSE-gzh-design（上游 AGPL-3.0 授权原文）")
+        return
+    lic_text = read(lic)
+    if "AGPL" not in lic_text.upper():
+        warn("上游署名", "LICENSE-gzh-design 里没看到 AGPL 字样，确认一下是不是拿错了文件")
+
+    rtext = read(os.path.join(ROOT, "README.md")) if \
+        os.path.isfile(os.path.join(ROOT, "README.md")) else ""
+    if "isjiamu/gzh-design-skill" not in rtext:
+        warn("上游署名", "README.md 里没写上游仓库地址（isjiamu/gzh-design-skill）")
+    else:
+        ok("上游署名", "授权原文与来源声明均在位")
 
 
 # ---- main -------------------------------------------------------------------
 def main():
     quiet = "--quiet" in sys.argv or "-q" in sys.argv
 
-    print("=" * 64)
+    print("=" * 66)
     print("  wechat-mp-publisher-skill · 仓库自检")
     print("  根目录：{}".format(ROOT))
-    print("=" * 64)
+    print("=" * 66)
 
     for fn in (check_required, check_frontmatter, check_version,
-               check_python_syntax, check_secrets, check_references, check_styles):
+               check_python_syntax, check_secrets, check_references,
+               check_themes, check_component_lint, check_upstream):
         try:
             fn()
-        except Exception as e:  # 自检器自身不应崩
+        except Exception as e:                       # noqa: BLE001
             fail(fn.__name__, "自检器异常：{}".format(e))
 
     tag = {"OK": "  OK  ", "WARN": " WARN ", "FAIL": " FAIL "}
@@ -347,7 +398,7 @@ def main():
 
     fails = sum(1 for r in results if r[0] == "FAIL")
     warns = sum(1 for r in results if r[0] == "WARN")
-    print("-" * 64)
+    print("-" * 66)
     if fails:
         print("结果：失败 {} 项，警告 {} 项".format(fails, warns))
         return 1

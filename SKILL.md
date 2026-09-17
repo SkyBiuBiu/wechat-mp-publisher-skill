@@ -1,13 +1,23 @@
 ---
 name: wechat-mp-publisher-skill
-description: 微信公众号图文发布技能。当用户要求「发公众号」「发一篇公众号文章/推文」「推到公众号草稿箱」「公众号排版发布」「把这篇发到微信公众号」时使用。支持六种视觉风格（工程橙/极简纸感/终端绿/杂志暖调/商务蓝/清单问答）与自定义 token；mermaid 图渲染成 PNG、代码围栏重建为可长按复制的内联高亮卡片（不转图片），发布前自动做平台约束体检（标题 32 字、作者 16 字、摘要 120 字、正文 2 万字符、图片体积与格式、外链图、排版与合规风险词），再通过微信官方 API 完成 access_token 获取、正文图片上传换链、封面永久素材上传、图文草稿创建，并可选正式发布。内置错误码中文翻译、IP 白名单诊断与白名单生效轮询。
+description: 微信公众号图文排版与发布技能。当用户要求「发公众号」「发一篇公众号文章/推文」「公众号排版」「推到公众号草稿箱」「把这篇发到微信公众号」时使用。排版侧采用 gzh-design 组件库范式：6 套精选主题（摸鱼绿/红白雪/石墨极简/留白禅意/摸鱼票据/橄榄手记）+ 跨主题通用组件库（代码块/图片/GIF/小标签），支持 Markdown / Word(.docx) / PDF / 纯文本输入，按文章类型配方装配纯 <section> 内联样式 HTML（文字全部 <span leaf> 包裹），双关卡校验（component_lint 查组件库源头 + validate_gzh_html 查产物）后生成带「复制」按钮的预览页；发布侧通过微信官方 API 完成 access_token 获取、mermaid 预渲染成 PNG、正文图片上传换链、封面永久素材上传、图文草稿创建，可选正式发布。内置错误码中文翻译、IP 白名单诊断与白名单生效轮询。
 agent_created: true
 ---
 
-# 微信公众号图文发布
+# 微信公众号图文排版与发布
 
-用微信官方 API 把一篇带图带排版的图文推进公众号草稿箱，可选继续正式发布。
-风格可预设、可自定义；发布前先过一遍平台约束体检。
+把一篇文章排成可直接粘贴进公众号编辑器的 HTML，再（可选）用微信官方 API 推进草稿箱。
+
+**两条链路，职责分明，别混用：**
+
+| 链路 | 归谁管 | 产物 |
+|---|---|---|
+| **排版**（主题选型、组件装配、合规校验） | `references/` 组件库 + 双关卡脚本 | 纯 `<section>` 正文 HTML + 预览页 |
+| **发布**（上传图片、建草稿、正式发布） | `scripts/publish.py` + `preflight.py` | 公众号草稿箱里的图文 |
+
+排版规则**全部沉淀在组件库里**，不要凭记忆手写 HTML——组件库里有什么就用什么。发布规则**全部沉淀在接口体检里**，不要靠"记得住"。
+
+---
 
 ## 一、能力边界（先判断可行性，再动手）
 
@@ -20,147 +30,214 @@ agent_created: true
 
 **行动规则**：
 
-- 个人主体账号 → 只做到建草稿，最后一步引导用户到 mp 后台草稿箱手动点「发表」。**不要反复重试发布**，`48001` 是账号类型限制，重试无意义。
+- 个人主体账号 → 只做到建草稿，最后一步引导用户到 mp 后台「内容与互动 → 草稿箱」手动点「发表」。**不要反复重试发布**，`48001` 是账号类型限制，重试无意义。
 - 企业/组织主体已认证账号 → 全链路可用，可执行发布。
 - 无法判断账号类型时，先跑 `check`，再跑 `draft`，用实际报错决定。
 
 详细权限矩阵、实测记录与接口字段约束见 `references/wechat-api-reference.md`。
 
-## 二、前置条件（缺一项就会失败，按顺序确认）
+## 二、前置条件
 
 1. **AppID / AppSecret**：在**微信开发者平台** `developers.weixin.qq.com/platform` 获取，不在 mp 后台。
    扫码登录 → 我的业务与服务 → 我的业务 → 公众号 → 基础信息 → 开发密钥。
    AppSecret 默认隐藏，点「启用」后**只显示一次**。
-   → 向用户索要凭证时，说明这条路径，并提醒启用可能需要实名/认证。
 2. **IP 白名单**：必须包含调用方的**公网 IPv4 出口 IP**。
-   - 取 IPv4：`curl -4 ipv4.icanhazip.com`（注意 `curl ifconfig.me` 可能返回 IPv6，微信不认）。
+   - 取 IPv4：`curl -4 ipv4.icanhazip.com`（`curl ifconfig.me` 可能返回 IPv6，微信不认）。
    - 配置入口：微信开发者平台 → 公众号详情页 → API IP白名单。
    - 改完通常要**管理员扫码确认**，且**有生效延迟**。
-   - 报 40164 时，直接读 `errmsg` 里的 IP，脚本也会自动提取提示。
-3. **文章素材**：正文 HTML 文件 + 封面图。正文里的图片写本地相对路径，脚本自动上传换链。
+   - 报 40164 时直接读 `errmsg` 里的 IP，脚本会自动提取提示。
+3. **封面图**：必填。`scripts/make_assets.py` 可生成 900×383 的（需 pillow）。
+4. **正文**：Markdown / docx / pdf / 纯文本 → 排出 HTML。
 
-## 三、视觉风格（先定配色，再写正文）
+> 只想排版、不推草稿？**第 3、4 项不需要**，直接走第三节开始的排版链路，产物是 HTML + 预览页。
 
-六条路线由 `assets/styles/*.json` 定义，**它们只管视觉**：配色、字号、行高、圆角、表格与代码块的观感。
+---
 
-**预设不约束文章内容与结构。** 写什么题材、分几节、每节讲什么、怎么开篇怎么收尾，全部由这篇的实际论证逻辑决定 —— 同一套配色可以用在教程、复盘、随笔上，结构各不相同。预设文件里也没有任何写作约束字段，这是刻意的：`validate_skill.py` 会拦住试图加回去的人。
+## 三、排版工作流
 
-| 预设 id | 名字 | 视觉观感 | 常配题材 |
-|---|---|---|---|
-| `engineering-orange` | 工程橙（默认） | 暖调橙 + 深色代码块，工程感强，长文耐读 | 实战教程、架构拆解、踩坑复盘 |
-| `minimal-paper` | 极简纸感 | 无彩色块，靠留白与细横线分层，读起来像纸 | 观点随笔、方法论、行业观察 |
-| `terminal-green` | 终端绿 | 深底绿 + 终端感代码块，代码是主角 | 源码分析、CLI 教程、报错定位 |
-| `magazine-warm` | 杂志暖调 | 暖色底、大引文、圆角卡片，有叙事感 | 项目复盘、访谈、团队故事 |
-| `business-blue` | 商务蓝 | 冷调蓝 + 细线分隔，信息密度高 | 方案说明、选型对比、阶段汇报 |
-| `checklist-qa` | 清单问答 | 浅底高对比，块状分隔清晰，扫读友好 | FAQ、SOP、避坑清单 |
+### Step 0：输入与格式归一化
 
-「常配题材」只是挑配色时的参考，不限制你写什么。
+用户可能给：Markdown 文本或 `.md` 路径（直接进 Step 1）、`.docx`、`.pdf`、`.txt`/无标记纯文本、网页富文本。
 
-**选风格的做法**：
+**非 Markdown 输入必须先读 `references/format-normalize.md`** 按其规则转成 Markdown 并做结构确认：docx 走 `scripts/extract_docx.py`，PDF 用分页读取+清噪，纯文本按标题启发式推断结构。
 
-- 用户没指定 → 按题材从表里选一条视觉路线，**在回复里说明选的是哪条、为什么**，不要默默用默认。
-- 用户指定了 preset id → 直接用。
-- 用户给的是视觉描述（「暖一点」「简洁些」「别太花」）→ 从表里挑最接近的，说明理由。
-- 用户给的是语气描述（「专业一点」「像跟同事讲」）→ 那是写作层面，跟配色无关：照要求写正文，视觉沿用当前风格。
-- 用户不满意 → 换一条重渲染即可，视觉是 token 驱动的，不需要重写内容。
+用户说「直接排 / 自动排 / 一键 / 不用问」→ 进**全自动模式**：跳过结构确认与选主题提问，自动推断结构、按题材自选主题，交付时附决策说明。
 
-**自定义**（三级粒度，详见 `references/style-presets.md`）：
+### Step 1：选主题
+
+读 `references/theme-index.md`（主题信息的**单一来源**），据题材主动推荐最契合的一套，再让用户一步确认：
+
+| 主题 | 主色 | 适合 |
+|---|---|---|
+| 摸鱼绿（默认） | `#059669` | 教程、测评、清单、工具盘点（卡片丰富、信息密度高） |
+| 红白色系 | `#DC2626` | 深度分析、观点、力量感话题（经典编辑风） |
+| 石墨极简风 | `#52525B` | 设计、科技评论、专业观点、高端品牌 |
+| 留白禅意风 | `#4A5D52` | 禅意、极简生活、深度随笔（呼吸感最强） |
+| 摸鱼票据风 | `#059669` | 工具对比、创意评测（票据视觉隐喻） |
+| 橄榄手记 | `#1e1f23` | 内刊手记、深度评测、案例复盘（信息密度偏高） |
+
+- **用户已指定** → 直接用，不问。
+- **题材有明确契合** → 单问确认：「建议用 XX（理由），确认还是换一套？」选项给推荐项 + 1~2 个备选。
+- **无明显倾向** → 默认推荐摸鱼绿放第一位，用 AskUserQuestion 让用户选。
+- **全自动模式** → 不提问，选题材最契合的，交付时说明理由。
+- **都不满意** → 走 `references/theme-generator.md` 生成新主题，登记后回到本步。
+- **同一篇只用一套主题，不跨主题混用组件。**
+
+### Step 2：读组件库（两份）
+
+1. 据 theme-index 的「组件库文件」列，Read 该主题专属库 `references/theme-{标识}.md`（引言卡、章节标题、正文标记、签名等）。
+2. **同时 Read** 通用增量库 `references/common-components.md`（代码块、图片/GIF、小标签标题——所有主题共用，套当前主题色）。
+
+**后续生成完全依据这两份组件库，HTML 一律从中取、不要手写。**
+
+### Step 3：解析结构 + 判定文章类型
+
+| 元素 | 识别规则 |
+|---|---|
+| 文章标题 | `# 标题` 或 frontmatter `title` |
+| 开头引言 | 文章最开头的 `> 引用` 块 |
+| 章节 / 子章节 | `##` / `###` |
+| 加粗 / 高亮 / 下划线 | `**文字**` / `==文字==` / `<u>文字</u>` 或 `++文字++` |
+| 图片 / GIF | `![说明](URL)`、`![](xxx.gif)` |
+| 代码 / 命令 / Prompt | ` ``` 围栏 ``` `、行内 `` `code` `` |
+| 表格 / 列表 / 分割线 | `\|` 表格、`- ` / `1. `、`---` |
+| mermaid | ` ```mermaid ` → **必须先跑 `render_mermaid.py` 转 PNG**，见 Step 4 |
+
+**然后判定文章类型**（取主导类型，可复合）：教程/操作指南、盘点/工具清单、观点/深度分析、访谈/人物特稿、数据复盘/报告、生活/情感随笔、案例实战。判定依据：步骤和命令多→教程；并列条目多→盘点；引语和人物叙事多→访谈；数字和对比多→数据；论证推演多→观点。
+
+### Step 4：按配方装配 HTML
+
+**先查所选主题库的「文章类型 → 组件组合配方」表**，按文章类型定核心组件组合与点缀组件——不要拿到组件库就逐段随机选，配方保证同类文章的排版气质稳定。
+
+然后依主题库的**「完整文章模板骨架」**装配：
+
+- **骨架顺序以主题库为准**，不同主题骨架不同，不要套用其它主题的骨架。
+- **行内标记按语义找组件**（组件编号各库不统一，以语义为准）：`**加粗**`→主色加粗；`==高亮==`→渐变背景高亮；`++文字++`→下划线；`>引用`→引用高亮块。
+- 来自通用库的：` ``` 代码块 ``` `→1a 深色/1b 浅色；行内 `` `code` ``→1c；图片→2a、GIF→2b、待补素材→2c；小标题/强调→3a–3e。
+- **优先级：先查主题库映射规则表**——该主题有等价语义组件就用主题库版本；没有才用通用库 3x 并按换色规则换成主题色。
+- **强调与小标题用「小标签/左竖条」，不要用四周虚线框**（`dashed` border）。唯一例外：主题库明确定义的虚线组件（如摸鱼绿的 quote-box）和通用库 2c 待补素材占位。
+
+**mermaid 图先渲染再装配**（在 Step 5 校验之前）：
 
 ```bash
-# 1. 微调几个 token：颜色用 #rgb/#rrggbb，尺寸用数字+单位
-python <skill>/scripts/apply_style.py --preset engineering-orange --set primary=#1f4e8c
-#    或写进 config.json 长期生效： "style": {"preset": "...", "overrides": {"primary": "#1f4e8c"}}
-
-# 2. 导出一份自己的预设，整份改
-python <skill>/scripts/apply_style.py --preset magazine-warm --dump my-style.json
-python <skill>/scripts/apply_style.py --style-file my-style.json -o article.html
-
-# 3. 想换写作风格？跟预设无关 —— 在指令里说清语气、人称、详略要求即可，视觉照旧
+python <skill>/scripts/render_mermaid.py article.md --theme moyu-green
+#   → 产出 article.mermaid.md（围栏已换成 ![](assets/mermaid-N.png)）
+#   → 产出 assets/mermaid-1.png、mermaid-2.png …
+#   本地装了 mmdc 会优先用；没有则走 mermaid.ink（涉密图表加 --no-remote 并装 mmdc）
+python <skill>/scripts/render_mermaid.py --list-themes      # 查主题标识
 ```
 
-**写正文时的执行要求**：
+装配时把 `mermaid-N.png` 当普通图片，用主题库/通用库的图片组件引用（不要留 ```mermaid 源码，会当正文发出去）。
 
-1. **结构自己定**。开篇从哪切入、分几节、每节承载什么、怎么收尾，按这篇的论证逻辑排：教程按操作顺序走，拆解按「是什么 → 怎么运作 → 边界在哪」走，复盘按时间线走，问答按问题组织。预设和模板都不规定这些，也没有固定套路可套。
-2. 用 `apply_style.py` 渲染出骨架，再把内容填进去 —— 骨架里的块（要点卡片、表格、代码块、问答块、步骤条）按内容需要挑用，不够就加、用不上就删。
-3. **每一节都要带本篇专属的信息**。写完逐节自查：把这一节挪到同主题的另一篇文章里，是否依然成立？成立的段落就是通用常识，删掉或换成具体的东西（本篇的数字、代码、真实 trace、真实报错）。
+### Step 5：双关卡校验（强制）
 
-## 四、平台约束（体检脚本会自动查，这里给全貌）
+```bash
+# 产物关：查禁用标签、<span leaf> 包裹、半角标点
+python <skill>/scripts/validate_gzh_html.py <装配好的.html>
 
-写内容时最容易翻车的是这几条，数值都是官方原文口径（完整表见 `references/wechat-api-reference.md`）：
+# 源头关：只有改过组件库时才需要跑
+python <skill>/scripts/component_lint.py <skill 目录>
+```
 
-| 约束项 | 上限 | 超了会怎样 |
-|---|---|---|
-| 标题 | 32 字 | 微信直接报错 |
-| 作者 | 16 字 | 直接报错 |
-| 摘要 | 120 字（留空自动抓正文前 54 字） | 直接报错 |
-| 正文 | **少于 2 万字符**（按 HTML 长度算）、小于 1MB | 直接报错 |
-| 原文链接 | 1KB | 直接报错 |
-| 正文图片 | 仅 jpg/png，单张 < 1MB | 报 40005 / 40009 |
-| 封面 | 必填，bmp/png/jpg/gif，< 10MB | 报 40007 |
-| 外链图 | **不允许**，会被静默过滤 | 不报错，图直接没了 |
-| `<style>` / `class` / JS | 会被剥离 | 不报错，样式全丢 |
+**ERROR 清零才算完成**；半角标点 WARNING 也要修到 0（实际使用中最高频的返工点）。报错就回 Step 4 改。
 
-> **图片清晰度体检**（发布前自动查）：封面宽度 <1200px 报 P1（会糊）、
-> <1800px 报 P2（未达 2x 高清，建议 1800×766）；正文图片宽度 <750px 报 P1（会糊，
-> 正文区约 677px 宽、2x 屏需约 1354px）。`make_assets.py` 生成的就是 2x 高清版，
-> mermaid 渲染默认 scale=3 保证手机上锐利。
+### Step 6：输出
 
-> **正文字符数按 HTML 长度算，不是纯文本字数**。这是最容易误判的一条：代码块多、标签多的文章，纯文本才 4000 字也可能撞上 2 万字符上限。突破手段：mermaid 渲染成 PNG、代码块交给 enhance_content.py 重建（见第四步），仍超就拆篇（见第十节）。
+**产物是纯 `<section>…</section>` 正文片段**，从全局容器开始，**不要包 `<!DOCTYPE>`/`<html>`/`<head>`/`<body>`**——公众号编辑器只接受正文片段。
 
-## 五、工作流程
+1. **干净正文文件**：存到工作目录，命名 `{原文件名}_排版_{主题中文名}({英文标识}).html`。
+2. **带「复制」按钮的预览页**：
+   ```bash
+   python <skill>/scripts/wrap_preview.py <干净正文.html>
+   ```
+   产出 `{...}_预览.html`，浏览器打开后右上角「复制到公众号」，点一下即把渲染后的富文本复制到剪贴板，再到公众号编辑器 Ctrl/⌘+V。按钮和脚本只在预览外壳里，**不在被复制的 section 内**。
+3. 告知用户：**打开 `{...}_预览.html` → 点右上角「复制」→ 编辑器粘贴**；并给出干净正文路径作为兜底，附校验结论。
+
+### 生成时的智能处理（本 skill 的特色，必须做）
+
+1. **章节自动编号**：按 `##` 顺序分配 `01/02/03…`；末章若为结语类，用主题库指定的结语编号变体（如 `∞`），未指定时沿用数字。
+2. **英文标签**：据中文章节标题生成（实测→TEST、教程→TUTORIAL、总结→SUMMARY…），主题库有槽位时使用。
+3. **正文关键词下划线（核心特色）**：**每个正文段落**主动找出 1–3 个最重要的短语，用 theme-index 的「正文下划线 CSS」标记。优先核心观点、结论、关键数据、专有名词；短语 4–15 字；整段无要点可不标。**即使原文没有任何加粗也要主动加**——它是出现频率最高的基础标记。
+4. **引言关键词高亮**：识别开头金句里的核心词，用高亮组件标记。
+5. **目录提取**：从所有 `##` 取前 3 个作为导读要点（主题库有目录组件时）。
+6. **开头引言卡署名**：有署名就写「—— 作者名」，没有就用与主题相关的简短落款或省略。**不要固定写别人的人名。**
+7. **尾部作者签名区（仅末尾一处）**：默认不写死人名，用 `{{作者名}}` 占位；原文末尾已有签名段就沿用原文署名。互动引导句可保留通用文案。
+8. **列表转换**：按主题库映射规则处理；无专属组件时转为带缩进的正文段落。
+9. **中文全角标点**：正文标点一律全角（，。！？：；""''（）——…）。**生成时直接写弯引号，不要先写直引号再事后替换。例外**：代码块、行内代码、英文专名/URL/标识符内部保持原样。
+
+### 视觉层级（3 层递进，所有主题通用）
+
+| 层级 | 作用 | 频率 | 手段 |
+|---|---|---|---|
+| 锚点层 | 最强锚点：产品名/步骤/CTA/核心金句 | 全文 ≤ 5 处 | 主色加粗、深色底白字引用 |
+| 标记层 | 正文关键词 | 每段 1–3 处 | 下划线标记 |
+| 容器层 | 引用块、概念标签、长句强调 | 按需 | 浅底引用、荧光笔、徽章 |
+
+### 平台红线（核心，完整检查交给校验脚本）
+
+- **禁止**：`<style>`/`<script>`/`<div>`、`class`/`id` 属性、`position:fixed/absolute/sticky`、`float`、`@media`/`@keyframes`、`display:grid`、CSS 变量、外部字体/CSS。
+- **必须**：样式全部内联 `style`；所有文字节点用 `<span leaf="">文字</span>` 包裹（否则粘贴后样式丢失）。
+- **可用**：`display:flex`（有限）、`linear-gradient`、`border-radius`、`box-shadow`、`<section>/<p>/<span>/<strong>/<img>/<h3>`。
+
+### Gotchas（真实排版踩过的坑）
+
+- **漏 `<span leaf>` 包裹**是最常见的致命错——粘贴后样式整片丢失。靠 Step 5 兜底，别跳过。
+- **下划线逐段落实**：不要整段划线，也不要有的段标有的段漏；列表项里的关键描述同样要标。
+- **章节编号错乱**：严格按 `##` 顺序，不跳号；结语编号变体只用于末章。
+- **签名区有且仅有末尾一个**：原文末尾已有签名/「点赞在看转发」段落时**并入**这唯一的签名区，不要保留原文段又再生成一个。
+- **图片说明硬造**：只有 `![说明](url)` 里真有说明才生成说明组件，空 alt 不要编造。
+- **图片自适应、不铺满**：`<img>` 一律 `max-width:100%;height:auto;display:block;margin:0 auto`，**不用 `width:100%`**（小图会被拉伸变糊）；只有表格/封面卡/流程图才用 `width:100%`。
+- **目录是精选不是全量**：展示精选的 3 个核心看点，章节多于 3 个时挑最重要的 3 个。
+- **代码块要紧凑、忌大空白**：每行一个 `<p style="margin:0">`，**绝不用 `white-space:pre`**；缩进只用全角空格 `　`，行距靠 `line-height:1.6`。
+- **代码/Prompt 必须用代码块组件**，不要塞进普通段落或引用块。
+- **待补素材居中**：`【插入…】`、待录屏/GIF/视频/成果图用通用库 2c 居中占位板块。
+- **原文内容遗漏**：每个段落、每张图都要转换，不得漏；不自行增删原文实质内容。
+- **占位图残留**：组件里带名片图占位而没真实 URL 时，整行删掉。
+
+### 自定义主题（想要内置 6 套之外的风格）
+
+读 `references/theme-generator.md` 并严格按其流程：收集偏好（一次问全）→ 生成区块库 HTML 存 `assets/theme-previews/{id}.html` 供整页确认 → 转标准 `references/theme-{id}.md`（补 `<span leaf>`、补齐五章节）→ 登记 `theme-index.md` → `component_lint.py` 到 0 ERROR。之后与内置主题完全同权。
+
+---
+
+## 四、发布工作流
 
 ### Step 1：准备工作目录
-
-在用户的工作目录下建发布目录，从技能模板复制骨架：
 
 ```bash
 mkdir -p wechat-publish/assets
 cp <skill>/assets/templates/config.example.json wechat-publish/config.json
-# 编辑 config.json 填 appid / appsecret / title / digest / style.preset
+# 编辑 config.json：appid / appsecret / theme / article.title / cover_file / content_file
 ```
 
-可选：用 `scripts/make_assets.py` 生成封面和插图（需 pillow），默认封面 900×383。
+`theme` 填 Step 1 选定的主题标识（纯记录 + 给 mermaid 取色用）。
 
-### Step 2：定风格、渲染正文骨架
+### Step 2：装配正文 → 双关卡校验
+
+见第三节 Step 4–5。产物落在 `wechat-publish/article.html`（或在 skill 外用你自己的工作目录）。
+
+### Step 3：封面
 
 ```bash
-python <skill>/scripts/apply_style.py --list                       # 看六条路线
-python <skill>/scripts/apply_style.py -o wechat-publish/article.html
-#   不带 --preset 时会自动读 config.json 的 style 段；也可显式 --preset terminal-green
+python <skill>/scripts/make_assets.py --out wechat-publish/assets \
+    --title "文章标题" --subtitle "副标题"
 ```
+需 `pillow`。默认出 900×383（微信推荐比例）。`--flow` 还能生成一张流程图占位。
 
-渲染顺带把封面配色建议定下来：封面主色跟 `primary` 保持一致，成套感最强。
-
-### Step 3：写正文
-
-- **全部使用内联样式**，`<style>` 与 `class` 会被公众号编辑器剥离。
-- 正文图片写成本地相对路径（如 `assets/diagram.png`），脚本会先上传到微信图床再替换 `src`。
-- **不要用外部图片链接**，微信会静默过滤外链图。
-- 不要用 `h1`~`h6`（样式被平台覆盖），小标题用加粗 `<p>`。
-- 结构按内容自行排布，每节都要有本篇专属信息 —— 详见第三节「写正文时的执行要求」。
-- **mermaid 直接写 ```mermaid 围栏**：发布前 `enhance_content.py` 渲染成 PNG 替换（公众号剥 JS 与 SVG 文字，PNG 是唯一稳妥形态）。
-- **代码直接写 ```python 等围栏**或 `<pre><code>`：会被重建为内联样式高亮卡片，手机长按可复制——不要把代码转成图片。
-- 详细标签约束见 `references/wechat-api-reference.md` 第五节。
-
-### Step 4：内容增强 + 发布前体检
+### Step 4：发布前体检
 
 ```bash
-# mermaid 围栏渲染成 PNG、代码围栏/<pre><code> 重建为内联高亮卡片（就地更新，自动留 .bak）
-python <skill>/scripts/enhance_content.py -c wechat-publish/config.json
-
-# 体检（draft 也会自动执行这两步）
 python <skill>/scripts/preflight.py -c wechat-publish/config.json
 ```
 
-增强说明：本地装了 mmdc（`npm i -g @mermaid-js/mermaid-cli`）就走本地渲染；
-没装且 config 未关 `mermaid.remote` 时走 mermaid.ink 远程渲染（图表内容会发给
-第三方服务，涉密图表别开）。两者都不可用时 mermaid 源码原样保留，体检报 WX216。
+**只查微信接口侧硬约束**（标题 32 字 / 作者 16 字 / 摘要 120 字 / 正文 1MB / 图片体积格式 / 外链图 / 残留围栏与 mermaid 源码）。排版问题不在这里查——那是 `validate_gzh_html.py` 的活。
 
-不连微信、不需要凭证，纯本地检查，输出 **P0 阻断 / P1 警告 / P2 建议** 三级清单，每项带「现象 + 处理」。
+> 「正文 2 万字符」这条**只提示不阻断**：官方文档写 2 万，但 2026-09-17 实测 `draft/add` 接受 45258 字符、回查 `draft/get` 得 45390 字符且尾部一致（完整落库未截断）。详见 `references/wechat-api-reference.md` 第二节。主题组件库是「每个元素挂满内联样式 + `span leaf` 包裹」的写法，体积天然是纯文本的 5~10 倍，压到 2 万以下会大幅牺牲版式，所以没再当硬约束。
 
-- 有 P0 → 退出码 1，**先修掉再往下走**。P0 项是「微信一定会报错或内容一定会坏」的。
-- P1/P2 → 退出码 0，逐条判断。`--warn-only` 可强制返回 0，`--json` 给 CI 用，`--no-compliance` 跳过合规词扫描。
-- 体检同时会校验 `style.preset` 是否存在、`style.overrides` 的 token 名是否合法。
+输出 **P0 阻断 / P1 警告 / P2 建议** 三级清单，每项带「现象 + 处理」。
+
+- 有 P0 → 退出码 1，**先修掉再往下走**。
+- P1/P2 → 退出码 0，逐条判断。`--warn-only` 强制返回 0，`--json` 给 CI 用。
 
 ### Step 5：建草稿
 
@@ -168,96 +245,139 @@ python <skill>/scripts/preflight.py -c wechat-publish/config.json
 python <skill>/scripts/publish.py draft -c wechat-publish/config.json
 ```
 
-按顺序执行：**跑体检 → 取 token → 正文图上传换链 → 封面传永久素材 → 建草稿 → 回查确认**。
-成功标志：输出 `draft media_id = ...`，并可用 `list` 在草稿箱查到。
-
-体检是自动执行的，P0 不过就会在这里停下（此时还不会发任何请求）。逃生口：`--no-preflight`（不建议）、`--no-compliance`。
+按顺序：**跑体检 → 取 token → 正文图上传换链 → 封面传永久素材 → 建草稿 → 回查确认**。
+成功标志：输出 `draft media_id = ...`。
+逃生口：`--no-preflight`（不建议）。
 
 ### Step 6：发布
 
-**先判断账号类型**（见第一节）：
+- 认证账号：`publish.py publish --media-id <草稿id> -y`。`-y` 仅在用户已明确授权时使用；发布不可撤回，会真实推送给粉丝。
+- 个人账号：**不要尝试**。告知用户到 mp 后台草稿箱手动点「发表」，并提醒个人订阅号每天有群发次数限制。
 
-- 认证账号：
-  ```bash
-  python <skill>/scripts/publish.py publish --media-id <草稿id> -y
-  ```
-  或直接 `publish`（会新建草稿再发，产生重复草稿，除非确有此意）。
-  `-y` 跳过交互确认，仅在用户已明确授权发布时使用；发布不可撤回，会真实推送给粉丝。
-- 个人账号：**不要尝试**。告知用户到 mp 后台「内容与互动 → 草稿箱」手动点「发表」，并提醒个人订阅号每天有群发次数限制。
+---
 
-## 六、命令速查
+## 五、命令速查
 
 | 命令 | 作用 |
 |---|---|
+| `render_mermaid.py article.md --theme X` | 排版前把 ```mermaid 渲染成 PNG，产出工作副本 |
+| `render_mermaid.py --list-themes` | 列出已注册主题标识 |
+| `validate_gzh_html.py <html>` | **产物关**：禁用标签 / `<span leaf>` / 半角标点 |
+| `component_lint.py <skill>` | **源头关**：扫组件库反模式（改过主题库才需要） |
+| `wrap_preview.py <html>` | 生成带「复制到公众号」按钮的预览页 |
+| `extract_docx.py <docx>` | Word 转 Markdown |
+| `preflight.py -c 配置` | 发布前体检（接口侧），`--json` / `--warn-only` / `--quiet` |
 | `publish.py check` | 验凭证 + 白名单，不发内容 |
-| `publish.py preflight` | 只做发布前体检，不连微信、不需要凭证 |
-| `publish.py enhance` | 内容增强：mermaid 渲染成 PNG、代码块重建为高亮卡片，不连微信 |
-| `publish.py draft` | 建草稿（安全档，推荐默认）。发请求前自动跑体检 |
+| `publish.py preflight` | 等价于单独跑 preflight.py |
+| `publish.py draft` | 建草稿（安全档，推荐默认）。发请求前自动体检 |
 | `publish.py publish` | 建草稿并立即发布 |
 | `publish.py publish --media-id XXX -y` | 发布草稿箱里已有的一篇 |
-| `publish.py list` | 列草稿箱 |
+| `publish.py list` / `--full` | 列草稿箱（`--full` 出完整 media_id） |
 | `publish.py delete --media-id XXX -y` | 删除指定草稿（破坏性，需显式给 id） |
 | `publish.py token -f` | 强制刷新 access_token（遇 40001 时用） |
-| `preflight.py -c 配置` | 体检单独跑：`--json` / `--warn-only` / `--no-compliance` |
-| `enhance_content.py -c 配置` | 单独跑内容增强：`mermaid` / `code` 子命令、`--dry-run`、`-o 写到别处` |
-| `apply_style.py --list` | 列出风格预设 |
-| `apply_style.py --preset X -o 文件` | 按预设渲染正文骨架 |
-| `apply_style.py --preset X --dump 文件` | 导出成可编辑的自定义预设 |
 | `watch_ip.py --draft` | 轮询等白名单生效，通了自动建草稿 |
-| `make_assets.py` | 生成封面与插图（需 pillow） |
+| `make_assets.py` | 生成封面（需 pillow） |
+| `validate_skill.py` | 仓库自检（改完 skill 必跑） |
 
-通用参数：`-c 路径` 指定配置文件（默认按「当前目录/config.json → 脚本目录/config.json」查找）、`-f` 强制刷新 token、`-y` 跳过发布确认。
-`draft` 的两个逃生口：`--no-preflight` 跳过体检、`--no-compliance` 体检时跳过合规词扫描。
+通用参数：`-c 路径` 指定配置（默认按「当前目录/config.json → 脚本目录/config.json」查找）、`-f` 强制刷新 token、`-y` 跳过发布确认。
+凭证也可用环境变量：`WECHAT_MP_APPID` / `WECHAT_MP_APPSECRET`。
 
-凭证也可用环境变量提供，无需配置文件：`WECHAT_MP_APPID` / `WECHAT_MP_APPSECRET`。
+---
+
+## 六、平台约束全貌
+
+写内容时最容易翻车的几条，数值都是官方原文口径（完整表见 `references/wechat-api-reference.md`）：
+
+| 约束项 | 上限 | 超了会怎样 |
+|---|---|---|
+| 标题 | 32 字 | 微信直接报错 |
+| 作者 | 16 字 | 直接报错 |
+| 摘要 | 120 字（留空自动抓正文前 54 字） | 直接报错 |
+| 正文体积 | **小于 1MB** | 直接报错 |
+| 正文字符数 | 2 万（文档口径，**实测未强制**） | 见下方说明 |
+| 原文链接 | 1KB | 直接报错 |
+| 正文图片 | 仅 jpg/png，单张 < 1MB | 报 40005 / 40009 |
+| 封面 | 必填，bmp/png/jpg/gif，< 10MB | 报 40007 |
+| 外链图 | **不允许**，会被静默过滤 | 不报错，图直接没了 |
+| `<style>` / `class` / JS | 会被剥离 | 不报错，样式全丢 |
+
+> **2 万字符这条是文档口径，实测没强制**：官方写 `content`「必须少于 2 万字符，小于 1M」，
+> 但 2026-09-17 实测 `draft/add` 接受 45258 字符、`draft/get` 回查得 45390 字符且尾部一致
+> （完整落库、未截断）。本技能据此把它降为 **P1 提示（WX022）**，不阻断。
+> 原因很实在：主题组件库是「每个元素挂满内联样式 + `span leaf` 包裹」的写法，
+> 体积天然是纯文本的 5~10 倍，硬压到 2 万以下等于放弃版式。
+> **1MB 字节数没有放松**，仍是 P0。剩余风险：正式发布（`freepublish` / 后台点发表）
+> 是否会二次校验字数**未验证**，真报错再按主题库的精简组件重排或拆篇。
+>
+> **判长度别用 `wc -c`**：它数的是 UTF-8 字节，中文按 3 字节计，会把 1.6 万字的文章显示成 2.1 万。以 `preflight.py` 的 Python `len(html)` 输出为准。
+>
+> **微信兼容铁律**（主题库已按此写好）：装饰性空元素内部要放 `<span leaf=""><br></span>` 占位；不要把 `font-size`/`border-bottom` 打在 `<strong>` 上；同一个 `<p>` 里不混多个字号；不用 `position:absolute` 做划线；无内容的结构化区域整块删掉。
+
+---
 
 ## 七、排障要点
 
-- 报 **40164**：白名单没配或没生效。先拿 `errmsg` 里的 IP，核对后台是否保存 + 管理员是否扫码。用 `watch_ip.py` 挂着等，不要反复手点。
-- 报 **48001**：账号类型限制，尤其 `freepublish`。转向手动发布路径，别重试。
+- 报 **40164**：白名单没配或没生效。拿 `errmsg` 里的 IP 核对后台是否保存 + 管理员是否扫码。用 `watch_ip.py` 挂着等，不要反复手点。
+- 报 **48001**：账号类型限制，尤其 `freepublish`。转手动发布路径，别重试。
 - 报 **40001**：token 被别处刷新导致缓存失效，`token -f` 重取。
-- 报 **40007**：封面素材缺失。`cover_file` 没配或文件路径错了，体检的 `WX016/WX017` 会提前拦。
-- 报 **40005 / 40009**：正文图格式或体积不对，体检的 `WX014/WX015` 会提前拦。
-- 正文图片不显示：用了外链图。改成 `<img src="assets/xxx.png">` 的本地相对路径写法。
-- 正文超 2 万字符：先确认是**HTML 长度**不是纯文本字数。mermaid 渲染成 PNG、代码块交给 `enhance_content.py` 重建是最有效的压降手段，仍超就拆篇（第十节）。
-- **判长度别用 `wc -c`**：它数的是 UTF-8 字节，中文按 3 字节计，会把 1.6 万字的文章显示成 2.1 万，据此删内容纯属白删。`preflight.py` 用的是 Python `len(html)`（字符数），以它的输出为准。
-- **正文莫名其妙超限、或图里印出 `<br data-page-node-id="…">`**：本地编辑器/预览器会往 HTML 注入记账属性，注入点包括代码块和 mermaid 源码里的 `<br/>`，后者会让 mermaid 认不出这个标签、当字面文本画出来。`enhance_content.py` / `preflight.py` / `publish.py` 现在都会自动剥离，无需手工清理；但**渲染完一定要看一眼图**（`assets/mermaid-*.png`），这类污染不报错、只画错。
+- 报 **40007**：封面素材缺失，体检的 `WX040/WX041` 会提前拦。
+- 报 **40005 / 40009**：正文图格式或体积不对，体检的 `WX030/WX031` 会提前拦。
+- **粘贴到公众号后样式全丢**：漏了 `<span leaf="">` 包裹。跑 `validate_gzh_html.py` 定位。
+- **正文图片不显示**：用了外链图。改成 `assets/xxx.png` 本地相对路径，脚本自动上传换链。
+- **正文莫名其妙超限**：先确认是 HTML 长度不是纯文本字数。另外本地编辑器/预览器会注入 `data-page-node-id` 之类记账属性，会把长度撑大——`preflight.py` / `publish.py` / `validate_gzh_html.py` 都会自动剥离，无需手工清理。
+- **mermaid 图里印出 `<br data-page-node-id="…">`**：编辑器注入的记账属性污染了 mermaid 源码，会让它认不出 `<br/>`、当字面文本画出来。渲染完**一定要看一眼 PNG**——这类污染不报错、只画错。
 - 发布提交成功但后台看不到：`errcode=0` 只代表任务提交成功，发布有延迟，最终结果走事件推送。
 - 完整错误码表见 `references/wechat-api-reference.md` 第三节。
+
+---
 
 ## 八、安全约束
 
 - `config.json` 与 `.token_cache.json` 含密钥，**不要写入 git**，不要回显完整 AppSecret。
 - 正式发布不可撤回。执行前必须让用户明确知情，默认只建草稿。
-- 提醒用户：AppSecret 若在对话或日志中明文出现过，正式使用前到开发者平台重置。
-- 合规词检查是**风险提示，不是违规判定**，不能替代人工审核。判定边界见 `references/wechat-api-reference.md` 第六、七节。
+- AppSecret 若在对话或日志中明文出现过，提醒用户正式使用前到开发者平台重置。
+
+---
 
 ## 九、仓库与迭代
 
-本技能同时是开源仓库 `SkyBiuBiu/wechat-mp-publisher-skill`（MIT），仓库根目录即技能根目录。
+本技能同时是开源仓库 `SkyBiuBiu/wechat-mp-publisher-skill`，仓库根目录即技能根目录。
+
+> ⚠️ **上游署名（不可删除）**：排版链路（`references/theme-*.md`、`common-components.md`、
+> `theme-generator.md`、`format-normalize.md`、`eval-cases.md`、`theme-index.md`、
+> `assets/preview-template.html`、`assets/sample-article.md`，以及
+> `scripts/validate_gzh_html.py`、`component_lint.py`、`wrap_preview.py`、`extract_docx.py`）
+> 来自 [**isjiamu/gzh-design-skill**](https://github.com/isjiamu/gzh-design-skill)，
+> 原创 **甲木 × 摸鱼小李**，授权 **AGPL-3.0**（原文见 `LICENSE-gzh-design`）。
+> 这部分内容不得删改署名，也不得闭源再分发。
 
 | 想找什么 | 去哪 |
 |---|---|
-| 面向人的完整手册（后台菜单路径、白名单排查清单、报错对照） | `docs/manual.md` |
-| 给使用者的项目说明与安装方式 | `README.md` |
-| 视觉风格、token 字典、自定义方式 | `references/style-presets.md` |
-| 接口约束、权限矩阵、体检判定依据 | `references/wechat-api-reference.md` |
+| 主题清单与下划线色值（单一来源） | `references/theme-index.md` |
+| 某套主题的全部组件 | `references/theme-{标识}.md` |
+| 代码块/图片/GIF/小标签（跨主题通用） | `references/common-components.md` |
+| 生成自定义主题 | `references/theme-generator.md` |
+| docx/pdf/纯文本 → Markdown | `references/format-normalize.md` |
+| 触发用例与回归核对 | `references/eval-cases.md` |
+| 接口约束、权限矩阵、错误码 | `references/wechat-api-reference.md` |
+| 面向人的完整手册 | `docs/manual.md` |
 | 版本变更记录 | `CHANGELOG.md` |
 | 开发约定与发版流程 | `CONTRIBUTING.md` |
 
 **改动本技能前**：先读 `CONTRIBUTING.md` 的三条硬规则（零第三方依赖、跨平台、绝不提交密钥），改完执行 `python scripts/validate_skill.py` 自检，必须全绿。
 
-改动涉及接口权限、字段约束时，必须附真实环境验证记录，不能只改文字结论 —— `references/wechat-api-reference.md` 里的权限矩阵是实测结果。
-新增体检规则时，在 `references/wechat-api-reference.md` 第六节同步登记，并标明依据属于**官方硬约束 / 实测行为 / 经验阈值**哪一类。
+改主题库组件时，改完必跑 `component_lint.py`；改产物装配逻辑时，改完必跑 `validate_gzh_html.py`。这两个脚本构成「改→验→修」闭环，不要绕过。
 
+---
 
-## 十、长文拆篇与「图文化」管线（正文超 2 万字符时）
+## 十、长文搬运与拆篇
 
-把现成 HTML 文档（深色设计系统、Mermaid 图、高亮代码块）转成公众号图文时，三个硬约束：正文 ≤2 万字符；`<script>`/`<style>`/class 全被剥掉；外链图被静默过滤。实测可行的管线：
+把现成 HTML 文档（深色设计系统、Mermaid 图、高亮代码块）转成公众号图文时的实操要点：
 
-1. **mermaid 图 → `enhance_content.py` 渲染成 PNG**。脚本自动把 ```mermaid 围栏替换成 `<img src="assets/mermaid-N.png">`（本地 mmdc 优先，mermaid.ink 远程兜底），走脚本自动上传换链，不再需要手动 playwright 截图。
-2. **代码块不要转图片**：`enhance_content.py code` 把 ``` 围栏与 `<pre><code>` 重建为内联样式高亮卡片（缩进 `&nbsp;`、换行 `<br>` 双保险），文字可选中、手机长按即复制——公众号剥 `<script>`，JS 一键复制按钮活不下来，「长按复制」是唯一可靠路径。代码卡片同时比裸 HTML 省大量字符，是压降 2 万字符上限的主力。
-3. **深色设计系统 → 浅色内联样式**：正文转白底配色（文字 #333/#4a5460、卡片 #f7f8fa、强调色加深到可读档），代码块保留深色底；`display:grid`/CSS 变量（`var(--c)`）公众号不可靠，须在转换时解析成具体颜色，多栏布局改纵向堆叠。
-4. **拆篇**：按章节组成每篇 ≤1.9 万字符的系列（通常 2-5 篇），标题用「主题①/②/③」编号，每篇独立 config（独立封面）逐篇跑 `draft`；篇尾加系列导航。
-5. **推送前用 playwright 以 414px 视口截图抽查**排版（表格换行、图片宽度、锚点残留——站内锚点 `<a href="#...">` 要降级成 `<span>`）。
-6. **每篇改完先跑 `preflight.py`**：拆篇后最容易出的是图片路径断裂（`WX012`）、代码块截图漏传（`WX012` 同类）、和上一篇残留的合规词。体检比人眼翻得快。
+1. **mermaid 图先跑 `render_mermaid.py` 渲染成 PNG**，装配时按图片组件引用，不要手动截图。
+2. **代码块不要转图片**：用通用库 1a/1b 代码块组件，文字可选中、手机长按即复制。公众号剥 `<script>`，JS 一键复制按钮活不下来，「长按复制」是唯一可靠路径。
+3. **深色设计系统 → 浅色内联样式**：正文转白底配色，代码块保留深色底；`display:grid`/CSS 变量公众号不可靠，须在装配时解析成具体值，多栏布局改纵向堆叠。
+4. **拆篇只在必要时做**。2 万字符已不是硬约束（见第六节实测），主题组件库动辄 4~5 万字符也发得出去，
+   所以**先按 `preflight.py` 的结果判断**：只有接口真回字数错误、或平台侧出现异常时才拆。
+   真拆的话：按章节组成系列，标题用「主题①/②/③」编号，每篇独立 config（独立封面）逐篇跑 `draft`，篇尾加系列导航。
+5. **推送前跑 `preflight.py`**：搬运场景最容易出的是图片路径断裂、残留围栏、上一篇残留内容。体检比人眼翻得快。

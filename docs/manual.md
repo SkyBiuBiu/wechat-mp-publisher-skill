@@ -11,7 +11,7 @@
 - [二、配 IP 白名单](#二配-ip-白名单)
 - [三、填配置](#三填配置)
 - [四、跑链路](#四跑链路)
-- [五、选视觉风格](#五选视觉风格)
+- [五、选主题](#五选主题)
 - [六、读体检报告](#六读体检报告)
 - [七、报错对照](#七报错对照)
 - [八、安全边界](#八安全边界)
@@ -141,10 +141,14 @@ mkdir -p work/assets
 cp assets/templates/config.example.json work/config.json
 ```
 
-正文不再需要手工复制模板 —— 用风格渲染器生成（见第五节）：
+正文不靠脚本渲染骨架 —— 按所选主题的组件库装配（见第五节）：
 
 ```bash
-python scripts/apply_style.py --preset engineering-orange -o work/article.html
+python scripts/render_mermaid.py --list-themes          # 看六套主题标识
+# 读 references/theme-index.md → 选定主题 → 读
+#   references/theme-<标识>.md（主题专属组件）
+#   references/common-components.md（代码块/图片/小标签，跨主题通用）
+# 然后把组件拼成 work/article.html
 ```
 
 编辑 `work/config.json`，**只有两个字段是必填**：
@@ -154,7 +158,7 @@ python scripts/apply_style.py --preset engineering-orange -o work/article.html
 | `appid` | 第一步记下的 AppID，`wx` 开头 18 位 |
 | `appsecret` | 第一步保存的 AppSecret |
 
-其余字段按需改：`article.title`（标题）、`article.digest`（摘要）、`article.content_file`（正文文件）、`article.cover_file`（封面路径）、`style.preset`（视觉风格）。
+其余字段按需改：`article.title`（标题）、`article.digest`（摘要）、`article.content_file`（正文文件）、`article.cover_file`（封面路径）、`theme`（主题标识）。
 
 > ⚠️ `config.json` 含密钥，**不要提交到 git、不要发给别人**。本仓库的 `.gitignore` 已经排除了它。
 
@@ -165,7 +169,10 @@ python scripts/apply_style.py --preset engineering-orange -o work/article.html
 四档，从安全到危险：
 
 ```bash
-# 档位 0：体检。不连微信、不需要凭证，只查内容和排版
+# 档位 -1：排版关。不连微信、不需要凭证，只查 HTML 合规
+python scripts/validate_gzh_html.py work/article.html
+
+# 档位 0：接口体检。不连微信、不需要凭证，只查标题字数/正文长度/图片约束
 python scripts/preflight.py -c work/config.json
 
 # 档位 1：自检。只验证凭证 + 白名单，不发任何内容
@@ -187,92 +194,119 @@ python scripts/publish.py publish -c work/config.json
 
 ### 正文 HTML 怎么准备
 
-```bash
-python scripts/apply_style.py --list                    # 先看六条视觉风格
-python scripts/apply_style.py --preset terminal-green -o work/article.html
-```
+正文必须**按主题组件库装配**，不要凭记忆手写。步骤：
 
-渲染出来的文件就是正文源文件，把它改成自己的内容即可。三条硬规则：
+1. 读 [`references/theme-index.md`](../references/theme-index.md) 选定主题；
+2. 读该主题组件库 `references/theme-<标识>.md`（含设计变量表、全部组件、**文章类型配方表**、
+   完整文章骨架、Markdown 映射规则）；
+3. 读 [`references/common-components.md`](../references/common-components.md) 拿代码块、图片、
+   GIF、小标签标题这些跨主题通用组件（套当前主题色）；
+4. 按主题库的「完整文章模板骨架」拼装，行内标记按语义找对应组件。
+
+四条硬规则：
 
 1. **全部用内联样式**。`<style>` 块和 `class` 会被公众号编辑器剥离，写了也白写。
-2. **不要用外链图**。写成本地相对路径（如 `<img src="assets/diagram.png">`），脚本会先上传到微信图床再替换 `src`。外链会被静默过滤 —— 不报错，但图没了。
-3. 不要 JS、不要 iframe、不要表单元素。
+2. **所有文字节点用 `<span leaf="">文字</span>` 包裹**。漏了这层包裹，粘到公众号后样式会整片丢失
+   —— 这是最常见的致命错，靠 `validate_gzh_html.py` 兜底。
+3. **不要用外链图**。写成本地相对路径（如 `<img src="assets/diagram.png">`），脚本会先上传到微信图床再替换 `src`。外链会被静默过滤 —— 不报错，但图没了。
+4. 不要 JS、不要 iframe、不要表单元素。
 
 图片限制：正文图仅 `jpg/png` 且单张 **< 1MB**。
 
-> 模板第 8 块引用了示例图 `assets/diagram.png`。没有这张图体检会报 `WX012`，放上自己的图或把那一块整段删掉。
+装配完先跑产物关，**ERROR 清零、半角标点 WARNING 也修到 0**：
+
+```bash
+python scripts/validate_gzh_html.py work/article.html
+python scripts/wrap_preview.py work/article.html      # 可选：生成带「复制」按钮的预览页
+```
 
 ### mermaid 图和代码块
 
-直接在正文里写 ```mermaid 围栏和 ```lang 代码围栏（或 `<pre><code>`），然后：
+**mermaid 在排版之前就要渲染**（公众号剥 JS 与 SVG 文字，PNG 是唯一稳妥形态）：
 
 ```bash
-python scripts/enhance_content.py -c work/config.json
+python scripts/render_mermaid.py article.md --theme moyu-green
 ```
 
-- mermaid 围栏渲染成 PNG 放进 `assets/`，正文替换为 `<img>`。本地装了 mmdc 就本地渲染；没装会用 mermaid.ink 在线渲染（图表内容会发给该第三方服务，涉密内容装 mmdc 后在 config 设 `"mermaid": {"remote": false}`）。
-- 代码围栏重建为内联样式高亮卡片，**不转图片**：文字可选中，手机上长按代码即可复制（公众号剥 `<script>`，JS 复制按钮活不下来，长按复制是唯一可靠路径）。
-- 就地更新前自动留 `article.html.bak` 备份；`--dry-run` 只报告不写；`draft` 前会自动执行，`--no-enhance` 可跳过。
+- 产出 `article.mermaid.md`（工作副本，围栏已换成 `![](assets/mermaid-N.png)`）和
+  `assets/mermaid-N.png`（默认 `scale=3`，手机上看不糊）。
+- 本地装了 mmdc（`npm i -g @mermaid-js/mermaid-cli`）走本地渲染，不联网；没装则走
+  mermaid.ink 在线渲染（图表内容会发给该第三方服务，涉密图表加 `--no-remote` 并装 mmdc）。
+- 图表的配色自动取所选主题「设计变量速查表」的主色。
+- **渲染完一定要看一眼 PNG**：本地编辑器若往 HTML 注入 `data-page-node-id` 这类记账属性，
+  会把 mermaid 源码里的 `<br/>` 污染成 `<br data-page-node-id="…">`，它认不出来就会当字面文本
+  画在图上。这类污染**不报错、只画错**。
+- 装配时把这些 PNG 当普通图片，用主题库/通用库的图片组件引用。
+
+**代码块不转图片**：用通用库 1a 深色 / 1b 浅色代码块组件，每行一个 `<p style="margin:0">`，
+缩进用全角空格 `　`，**绝不用 `white-space:pre`**。文字可选中，手机上长按代码即可复制
+（公众号剥 `<script>`，JS 复制按钮活不下来，长按复制是唯一可靠路径）。
 
 更细的标签与样式约束见 [`references/wechat-api-reference.md`](../references/wechat-api-reference.md) 第五节。
 
-### 想批量生成封面和配图
+### 想生成封面
 
 ```bash
 python scripts/make_assets.py --title "标题" --subtitle "副标题" --date "2026-09-14"
 ```
 
 需 `pillow`：`pip install pillow`。默认输出 900×383 封面（2.35:1）与一张正文插图。
-封面主色跟所选预设的 `primary` 保持一致，成套感最强。
+封面主色跟所选主题的主色保持一致，成套感最强。
 
 ---
 
-## 五、选视觉风格
+## 五、选主题
 
-预设只定义**视觉**：配色、字号、行高、圆角、表格与代码块的观感。文章写什么题材、分几节、
-怎么收尾，预设不参与。完整说明（含 17 个 token 字典）见
-[`references/style-presets.md`](../references/style-presets.md)，这里是速查：
+主题决定**整篇的排版气质与组件体系**：配色、组件形状、章节标题样式、正文关键词标记方式、
+代码块与图片的容器样式。文章写什么题材、分几节、怎么收尾，由内容自己决定。
 
-| 预设 | 视觉观感 | 常配题材（参考） |
+完整清单与下划线色值以 [`references/theme-index.md`](../references/theme-index.md) 为**单一来源**，
+这里是速查：
+
+| 主题 | 主色 | 适合 |
 |---|---|---|
-| `engineering-orange` 工程橙（默认） | 暖调橙 + 深色代码块，长文耐读 | 实战教程、架构拆解、踩坑复盘 |
-| `minimal-paper` 极简纸感 | 无彩色块，留白与细横线分层 | 观点随笔、方法论、行业观察 |
-| `terminal-green` 终端绿 | 深底绿 + 终端感代码块 | 源码分析、CLI 教程、报错定位 |
-| `magazine-warm` 杂志暖调 | 暖色底、大引文、圆角卡片 | 项目复盘、访谈、团队故事 |
-| `business-blue` 商务蓝 | 冷调蓝 + 细线分隔，信息密度高 | 方案说明、选型对比、阶段汇报 |
-| `checklist-qa` 清单问答 | 浅底高对比，块状分隔清晰 | FAQ、SOP、避坑清单 |
+| **摸鱼绿**（默认） | `#059669` | 教程、测评、清单、工具盘点（卡片丰富、信息密度高） |
+| **红白色系** | `#DC2626` | 深度分析、观点、力量感话题（经典编辑风） |
+| **石墨极简风** | `#52525B` | 设计、科技评论、专业观点、高端品牌 |
+| **留白禅意风** | `#4A5D52` | 禅意、极简生活、深度随笔（呼吸感最强） |
+| **摸鱼票据风** | `#059669` | 工具对比、创意评测（票据视觉隐喻） |
+| **橄榄手记** | `#1e1f23` | 内刊手记、深度评测、案例复盘（信息密度偏高） |
 
-选不准就看题材：**教人做事** → 工程橙 / 终端绿；**讲一个判断** → 极简纸感 / 商务蓝；**讲一件事** → 杂志暖调；**回答问题** → 清单问答。
+选不准就看题材：**教人做事** → 摸鱼绿 / 摸鱼票据；**讲一个判断** → 红白 / 石墨极简；
+**讲一件事** → 橄榄手记；**什么都不想强调** → 留白禅意。
 
-### 换风格
+### 换主题
 
-```bash
-# 换一条预设，重渲染即可。内容不用动，视觉是 token 驱动的
-python scripts/apply_style.py --preset minimal-paper -o work/article.html
-
-# 微调单个 token
-python scripts/apply_style.py --preset business-blue --set primary=#1f4e8c
-
-# 长期生效：写进 config.json
-# "style": { "preset": "business-blue", "overrides": { "primary": "#1f4e8c" } }
-```
-
-带 `--preset` 时以命令行为准；不带时读 `config.json` 的 `style.preset`；都没有就用 `engineering-orange`。
-
-### 想要自己的风格
+**换主题 = 换一份组件库重新装配一遍**。这是与旧版最大的区别：旧版换主题只是换 token、
+重渲染即可；现在组件的 HTML 结构本身就是主题的一部分，所以要重新拼装。
 
 ```bash
-python scripts/apply_style.py --preset magazine-warm --dump my-style.json
-# 编辑 my-style.json：改 tokens（颜色 / 字号 / 间距 / 圆角）
-python scripts/apply_style.py --style-file my-style.json -o work/article.html
+# 1. 选定新主题，读它的组件库
+python scripts/render_mermaid.py --list-themes
+# 2. 重排 article.html
+# 3. 重新校验
+python scripts/validate_gzh_html.py article.html
+# 4. 重新跑 render_mermaid.py（图表配色跟着主题走）
+python scripts/render_mermaid.py article.md --theme graphite-minimal --in-place
 ```
 
-token 写错会被直接拦下：颜色必须是 `#rgb` / `#rrggbb`（不支持 `red`、`rgb()`、`var(--x)`），尺寸必须带单位。
-`config.json` 里写错的 token 名，体检时会报 `WX214`。
+> 为什么不保留「一键换肤」？因为组件库的价值恰恰在于每套主题的组件是为它的气质专门打磨的
+> （摸鱼绿的杂志快讯封面、石墨极简的超大水印编号、留白禅意的大留白衬线引用），
+> 用统一 token 去驱动会把它们的差异抹平。
 
-**视觉和写作分开管**：预设只决定配色与排版，换配色不会改掉文章怎么写。渲染出的骨架里的块
-（要点卡片、表格、代码块、问答块、步骤条）按内容需要挑用，不够就加、用不上就删 ——
-骨架给的是可用的零件，不是必须填满的表格。
+### 想要自己的主题
+
+让 AI 走 [`references/theme-generator.md`](../references/theme-generator.md) 的生成器：
+
+1. **收集偏好**（一次问全）：主题描述必填，或给一张参考图；名称 / 五色 / 字体 / 圆角 / 阴影可留空自动补全。
+2. **生成区块库**：产出 45~75 个区块的完整 HTML，存到 `assets/theme-previews/{id}.html`，
+   浏览器打开整页浏览确认风格。
+3. **转标准主题库 + 登记**：确认后转成 `references/theme-{id}.md`（补 `<span leaf>`、补齐五章节），
+   在 `theme-index.md` 登记一行，跑 `component_lint.py` 到 0 ERROR。
+4. 之后它与内置 6 套完全同权，直接说「用 XX 主题排这篇」即可。
+
+> ⚠️ 新增主题后必须跑 `python scripts/validate_skill.py` —— 组件库存在但没登记到
+> `theme-index.md` 会被判 FAIL。
 
 ---
 
@@ -286,16 +320,19 @@ python scripts/preflight.py -c work/config.json
 
 | 级别 | 含义 | 怎么办 |
 |---|---|---|
-| **P0 阻断** | 微信一定会报错，或内容一定会坏（字数超限、图片超 1MB、外链图等） | 必须改，退出码 1 |
-| **P1 警告** | 发得出去，但排版会塌、图会丢、或有合规风险 | 逐条判断，多数建议改 |
+| **P0 阻断** | 微信一定会报错，或内容一定会坏（字数超限、图片超 1MB、外链图、残留 mermaid 源码等） | 必须改，退出码 1 |
+| **P1 警告** | 发得出去，但图会丢、封面会被裁糊 | 逐条判断，多数建议改 |
 | **P2 建议** | 不影响发布，改了更好 | 有空再说 |
+
+> **体检只管接口侧硬约束。** 排版问题（漏 `<span leaf>`、半角标点、禁用标签）
+> 不在这里查 —— 那是 `validate_gzh_html.py` 的活，两道关都要过。
 
 常用参数：
 
 ```bash
 python scripts/preflight.py -c work/config.json --json         # 结构化输出，给 CI
 python scripts/preflight.py -c work/config.json --warn-only    # 有 P0 也返回 0，只报告
-python scripts/preflight.py -c work/config.json --no-compliance # 跳过合规词扫描
+python scripts/preflight.py -c work/config.json --quiet        # 只打印问题清单
 python scripts/publish.py preflight -c work/config.json        # 等价写法
 ```
 
@@ -303,10 +340,10 @@ python scripts/publish.py preflight -c work/config.json        # 等价写法
 
 - **正文字符数按 HTML 长度算，不是纯文本字数。** 报告里两个数都给：`正文 19056 字符 | 纯文本 4210 字`。
   标签多、代码块多的文章，纯文本字数不高也可能撞上限。
-- **合规词（`WX114`）是风险提示，不是违规判定。** 只说明这句话值得人工过一眼，
-  「唯一标识」这类技术术语会被误报。它不替代人工审核。
+- **别用 `wc -c` 数长度。** 它数的是 UTF-8 字节，中文按 3 字节计，会把 1.6 万字的文章显示成
+  2.1 万，据此删内容纯属白删。以 `preflight.py` 的 Python `len(html)` 输出为准。
 - **判定依据分三类**：官方硬约束（必须改）、实测行为（改了更稳）、经验阈值（自行判断）。
-  全部 51 条检查项依据的标注见 [`references/wechat-api-reference.md`](../references/wechat-api-reference.md) 第六节。
+  检查项依据的标注见 [`references/wechat-api-reference.md`](../references/wechat-api-reference.md) 第六节。
 
 ---
 
@@ -315,18 +352,22 @@ python scripts/publish.py preflight -c work/config.json        # 等价写法
 | 现象 | 原因 | 处理 |
 |---|---|---|
 | 体检报 P0 | 字数/图片/封面/链接有硬伤 | 按报告里的「处理」一栏改，或 `--warn-only` 只看不拦 |
-| 体检报 `WX012` | 正文里的图片路径不存在 | 模板自带的 `assets/diagram.png` 是示例，换成自己的图或删掉那块 |
-| 体检报 `WX114` | 命中合规风险词 | 人工判断，技术术语可忽略，`--no-compliance` 可整体跳过 |
+| 粘贴到公众号后样式全丢 | 漏了 `<span leaf="">` 包裹 | 跑 `validate_gzh_html.py`，按报的位置补包裹 |
+| 校验报半角标点 WARNING | 正文混了半角逗号句号或英文直引号 | 改全角（代码块内不用改） |
+| 体检报 `WX029` | 正文里的图片路径不存在 | 换成自己的图，或删掉那块组件 |
+| 体检报 `WX028` | 用了外链图，会被静默过滤 | 改成 `assets/xx.png` 本地相对路径 |
+| 体检报 `WX026` | 正文残留 ```mermaid 源码 | 先跑 `render_mermaid.py` 转 PNG 再装配 |
 | `40164` | 出口 IP 不在白名单 | [第二节](#二配-ip-白名单)，加当前公网 IPv4 |
 | `40013` / `40125` | AppID / AppSecret 错 | 检查有没有复制到空格、大小写 |
 | `40243` | AppSecret 被冻结 | 后台解冻 |
 | `48001` | 账号没有该接口权限 | 账号类型问题，见[第〇节](#〇先确认账号有资格)。重试无意义 |
-| `40005` | 正文图格式不对 | `uploadimg` 只收 jpg/png（体检 `WX014` 会提前拦） |
-| `40009` | 图片体积超限 | 压到 1MB 以下（体检 `WX015` 会提前拦） |
-| `40007` | media_id 无效 | 封面素材缺失，检查 `cover_file`（体检 `WX016/WX017` 会提前拦） |
+| `40005` | 正文图格式不对 | `uploadimg` 只收 jpg/png（体检 `WX030` 会提前拦） |
+| `40009` | 图片体积超限 | 压到 1MB 以下（体检 `WX031` 会提前拦） |
+| `40007` | media_id 无效 | 封面素材缺失，检查 `cover_file`（体检 `WX040/WX041` 会提前拦） |
 | `40001`（之前是好的） | token 被别处刷新，本地缓存失效 | `python scripts/publish.py token -f` |
 | 正文里图片不显示 | 用了外链图片 | 改成本地相对路径写法 |
-| 正文超 2 万字符 | 按 HTML 长度算超了 | 代码块/图表截图成 PNG，或按章节拆篇 |
+| 正文超 2 万字符（WX022） | 文档口径，**实测未强制** | 4.5 万字符实测可发且不截断，照发即可；真被接口回字数错误再压 |
+| mermaid 图里印出 `<br data-page-node-id="…">` | 编辑器注入的记账属性污染了源码 | 重跑 `render_mermaid.py`（会自动剥离），**渲染完看一眼 PNG** |
 | 草稿建了但发布失败 `53503/53504/53505` | 草稿未通过发布检查 / 需官网手动发布 | 转 mp 后台手动点「发表」 |
 
 完整错误码表（含 `-1`、`45009`、`50004` 等）见 [`references/wechat-api-reference.md`](../references/wechat-api-reference.md) 第三节。
@@ -338,5 +379,5 @@ python scripts/publish.py preflight -c work/config.json        # 等价写法
 - 脚本**默认只建草稿**，不会推送粉丝。`publish` 有二次确认，需显式输入 `yes` 或加 `-y`。
 - `config.json` 与 `.token_cache.json` 含敏感信息，已在 `.gitignore` 中。CI 挂了 gitleaks 兜底。
 - 正式发布（`freepublish`）**提交成功 ≠ 发布成功**。最终结果走微信服务端事件推送（`PUBLISHJOBFINISH`），审核失败会在推送里报 `53503` 等。
-- 体检的合规词检查是**风险提示，不是违规判定**，不替代平台审核，也不替代人工判断。
 - AppSecret 若在对话、日志或截图中明文出现过，正式使用前到开发者平台**重置**一次。
+- 上游排版链路为 AGPL-3.0（详见 [`LICENSE-gzh-design`](../LICENSE-gzh-design)），署名与授权声明不得删除。

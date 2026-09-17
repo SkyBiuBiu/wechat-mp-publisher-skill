@@ -8,20 +8,30 @@
 
 | 路径 | 约束 |
 |---|---|
-| `SKILL.md` | **必须在根目录**，frontmatter 需含 `name` / `description`，`name` 与目录名一致 |
+| `SKILL.md` | **必须在根目录**，frontmatter 需含 `name` / `description` / `agent_created`，`name` 与目录名一致 |
 | `scripts/` | 可执行脚本。技能被调用时，AI 从这里找工具 |
-| `references/` | 供 AI 参考的文档，按需加载，不进主上下文 |
-| `assets/styles/` | 风格预设（每路线一个 JSON）。**文件名必须等于内部的 `id` 字段**，token 要覆盖全部 16 个键 |
-| `assets/templates/` | 模板与配置样例。`article.template.html` 的 `{{}}` 占位符必须都在 token 字典内且全部用到 |
+| `references/` | 供 AI 参考的文档与主题组件库，按需加载，不进主上下文 |
+| `references/theme-index.md` | **主题信息的单一来源**。新增主题必须在此登记，否则 `validate_skill.py` 判 FAIL |
+| `references/theme-{标识}.md` | 单套主题组件库，五章节齐全（变量表 / 组件 / 骨架 / 配方表 / 映射表） |
+| `assets/templates/` | 模板与配置样例。`config.example.json` 只允许占位值 |
 | `docs/` | 面向人的文档，GitHub 展示用，AI 不读 |
 | `.github/` | CI 与协作模板 |
+
+> **上游目录不要动**：`references/theme-*.md`、`common-components.md`、`theme-generator.md`、
+> `format-normalize.md`、`eval-cases.md`、`theme-index.md`、`assets/preview-template.html`、
+> `assets/sample-article.md`，以及 `scripts/validate_gzh_html.py`、`component_lint.py`、
+> `wrap_preview.py`、`extract_docx.py` 来自 [isjiamu/gzh-design-skill](https://github.com/isjiamu/gzh-design-skill)
+> （甲木 × 摸鱼小李，AGPL-3.0，原文见 `LICENSE-gzh-design`）。
+> 同步上游更新时整文件覆盖，**不要为了本地便利改它们的路径或删署名**——
+> `wrap_preview.py` 依赖 `assets/preview-template.html` 的相对位置，
+> `component_lint.py` 只扫 `references/*.md`（非递归）。
 
 ## 硬性规则
 
 1. **绝不提交密钥**。`config.json`、`.token_cache.json`、`.env` 已在 `.gitignore` 中。
    `config.example.json` 只允许占位值（`wx0000...` / 全 0）。
    提 PR 前跑 `python scripts/validate_skill.py`，它会扫一遍。
-2. **脚本保持零第三方依赖**（`publish.py` / `preflight.py` / `apply_style.py` /
+2. **脚本保持零第三方依赖**（`publish.py` / `preflight.py` / `render_mermaid.py` /
    `watch_ip.py` / `validate_skill.py` / `build_zip.py`）。
    只有 `make_assets.py` 允许依赖 `pillow`，且必须能优雅降级/给出安装提示。
    理由：技能会被直接投放到用户机器上跑，装依赖是最大的摩擦来源。
@@ -35,8 +45,20 @@
 5. **破坏性操作必须二次确认**。`publish` / `delete` 保留交互确认与 `-y` 逃生口。
 6. **新增体检规则要登记依据**。`preflight.py` 里新增一条检查，必须在
    `references/wechat-api-reference.md` 第六节的表格里同步登记，并标明它属于
-   **官方硬约束 / 实测行为 / 经验阈值** 哪一类 —— 三类可信度不同，混在一起会误导使用者。
-   合规类词库尤其要注意：它是风险提示，不是违规判定，措辞不能写成结论。
+   **官方硬约束 / 文档口径（实测未强制）/ 实测行为 / 经验阈值** 哪一类 —— 四类可信度不同，
+   混在一起会误导使用者。
+   **凡是靠「实测」下的结论，必须写清测的时间与测法**（如「2026-09-17，`draft/add`
+   发 45258 字符被接受，`draft/get` 回查 45390 字符且尾部一致」）。平台改行为时，
+   只有带时间戳的记录才能被追查和推翻 —— 光写「实测如此」，下一个人没法判断它还有效没有。
+7. **职责不要越界**。三类问题各有归属，别把它们混进同一个脚本：
+   | 问题类型 | 归谁 | 例子 |
+   |---|---|---|
+   | 排版与合规 | `validate_gzh_html.py`（产物）/ `component_lint.py`（组件库） | 漏 `<span leaf>`、半角标点、禁用标签 |
+   | 接口硬约束 | `preflight.py` | 标题超 32 字、外链图、正文超 1MB |
+   | 内容预处理 | `render_mermaid.py` | mermaid 围栏转 PNG |
+   `preflight.py` 里**不要再加排版规则**——那是上一版的设计，改主题时要动两处的教训。
+8. **改主题库必跑源头关**：`python scripts/component_lint.py .`，必须 0 ERROR。
+   改产物装配逻辑必跑 `python scripts/validate_gzh_html.py <产物>`，0 ERROR 且半角 WARNING 为 0。
 
 ## 开发流程
 
@@ -55,17 +77,20 @@ python scripts/build_zip.py
 
 ```bash
 mkdir -p /tmp/wx-e2e/assets && cd /tmp/wx-e2e
-python /path/to/repo/scripts/apply_style.py --preset engineering-orange -o article.html  # 先渲染正文
+cp /path/to/repo/assets/preview-template.html .          # 不需要，预览页脚本自己会找
+cp /path/to/repo/assets/sample-article.md article.md     # 拿仓库自带样例当正文源
+# 按 references/theme-index.md 选主题 → 读 references/theme-<标识>.md 装配 article.html
+python /path/to/repo/scripts/validate_gzh_html.py article.html   # 产物关，必须 0 ERROR
 cp /path/to/repo/assets/templates/config.example.json config.json
 # 填入自己的 appid / appsecret，然后
-python /path/to/repo/scripts/preflight.py -c config.json    # 体检：不连网，先查内容
+python /path/to/repo/scripts/preflight.py -c config.json    # 体检：不连网，先查接口约束
 python /path/to/repo/scripts/publish.py check               # 验凭证 + 白名单
 python /path/to/repo/scripts/publish.py draft               # 建草稿
 python /path/to/repo/scripts/publish.py delete --media-id <验证稿id> -y   # 用完删掉，别污染草稿箱
 ```
 
-`preflight.py` 与 `apply_style.py` 不需要凭证，也不联网，改完这两个脚本直接拿仓库里的
-`assets/templates/` 试跑就能验证，不用碰真实公众号。
+`preflight.py`、`validate_gzh_html.py`、`component_lint.py`、`render_mermaid.py`（`--check` 模式）
+都不需要凭证，改完直接拿仓库里的 `assets/sample-article.md` 试跑就能验证，不用碰真实公众号。
 
 ## 版本与发布
 

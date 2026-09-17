@@ -10,21 +10,8 @@
 
   "author": "Sky",
 
-  "_style": "推文视觉风格。preset 取 assets/styles/ 下的文件名（不带 .json）；overrides 只写要改的 token，其余继承预设。可用 python scripts/apply_style.py --list 查看全部。预设只管视觉，不影响文章内容与结构",
-  "style": {
-    "preset": "engineering-orange",
-    "overrides": {
-      "_示例": "想微调时把下面几行解开，key 必须是 apply_style.py 认识的 token",
-      "_primary": "#1f4e8c",
-      "_font_size": "16px"
-    }
-  },
-
-  "_code": "代码块重建。highlight=离线语法高亮；copy_hint=卡片头部显示「长按复制」提示",
-  "code": {
-    "highlight": true,
-    "copy_hint": true
-  },
+  "_theme": "排版用的主题标识。取值见 references/theme-index.md，可选：moyu-green(摸鱼绿) / red-white(红白雪) / graphite-minimal(石墨极简) / zen-whitespace(留白禅意) / moyu-ticket(摸鱼票据) / olive-journal(橄榄手记)。只影响排版气质，不影响文章内容与结构",
+  "theme": "moyu-green",
 
   "_mermaid": "mermaid 图渲染为 PNG（公众号剥 JS 与 SVG 文字）。remote=true 且本地没装 mmdc 时走 mermaid.ink 在线渲染，图表内容会发给该第三方服务；涉密内容请本地安装 mmdc（npm i -g @mermaid-js/mermaid-cli）并设 remote=false",
   "mermaid": {
@@ -41,7 +28,7 @@
     "_digest": "摘要，硬上限 120 字。留空则自动抓正文前 54 字",
     "digest": "在这里填摘要（上限 120 字，留空会自动抓正文前 54 字）",
 
-    "_content_file": "正文 HTML 文件，路径相对本配置文件的目录。用 apply_style.py 渲染生成，图片写本地相对路径即可，脚本会自动上传换链",
+    "_content_file": "正文 HTML 文件，路径相对本配置文件的目录。按所选主题的组件库手工装配（纯 <section> 片段，内联样式 + <span leaf> 包裹），图片写本地相对路径即可，脚本会自动上传换链",
     "content_file": "article.html",
 
     "_cover_file": "封面图。必须传，且走永久素材接口，生成 media_id 填进 thumb_media_id。建议 900x383（2.35:1）",

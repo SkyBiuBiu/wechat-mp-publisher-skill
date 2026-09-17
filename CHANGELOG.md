@@ -16,6 +16,86 @@
 - 封面裁剪比例 `cover_info.crop_percent_list` 支持（`2.35_1` / `1_1`）
 - 图片消息（`article_type=newspic`）支持
 
+## [0.5.0] - 2026-09-17
+
+### Changed
+
+- **排版与校验链路整体换成 gzh-design 组件库范式，旧的自研排版层全部删除。**
+  原先的排版是「JSON 预设 token → `apply_style.py` 注入模板 → `preflight.py` 52 条规则兜底」，
+  输出的是 class 自由、靠预设注入样式的 HTML。现改为上游
+  [isjiamu/gzh-design-skill](https://github.com/isjiamu/gzh-design-skill)（甲木 × 摸鱼小李，
+  AGPL-3.0）的组件库范式：Agent 读主题组件库手工装配纯 `<section>` 内联样式 HTML，
+  文字全部 `<span leaf="">` 包裹，由双关卡脚本确定性兜底。
+  - **6 套主题组件库**取代 6 套 JSON 预设：摸鱼绿（默认）/ 红白色系 / 石墨极简 /
+    留白禅意 / 摸鱼票据 / 橄榄手记。每套 20~41 个精细组件 + 设计变量表 + 文章类型
+    配方表 + 完整骨架 + Markdown 映射规则
+  - 新增 `references/common-components.md`（跨主题通用组件：代码块 / 图片 / GIF /
+    小标签标题）、`theme-generator.md`（自定义主题生成器）、`format-normalize.md`
+    （docx/pdf/纯文本 → Markdown）、`eval-cases.md`（回归用例）
+  - **校验拆成双关卡**：`validate_gzh_html.py` 查产物（禁用标签 / `<span leaf>` /
+    半角标点），`component_lint.py` 查组件库源头（`white-space:pre` / 正文虚线框 /
+    平台禁用项）。取代原 `preflight.py` 的 52 条排版规则
+  - 新增 `wrap_preview.py` + `assets/preview-template.html`：生成带「复制到公众号」
+    按钮的预览页，一键把富文本复制到剪贴板
+  - 新增 `extract_docx.py`：Word 转 Markdown
+
+### Added
+
+- `scripts/render_mermaid.py`：从 `enhance_content.py` 抽出的 mermaid 预渲染器，
+  脱离主题 token 体系（改从主题库「设计变量速查表」取主色），在**排版之前**把
+  ```mermaid 围栏渲染成 PNG 并产出工作副本。支持 `--theme` / `--list-themes` /
+  `--check` / `--config` / `--no-remote`
+- `preflight.py` 转为**只查微信接口侧硬约束**（标题 / 作者 / 摘要长度、正文 2 万字符
+  与 1MB、图片体积格式、外链图、base64 图、残留 Markdown 围栏与 mermaid 源码、
+  封面比例与分辨率、主题标识是否已注册）。排版类规则全部移交双关卡脚本
+- `config.json` 用 `theme`（主题标识）取代 `style.preset` / `style.overrides`；
+  移除 `code.highlight` / `code.copy_hint`（代码块改由通用组件库承担）
+- `validate_skill.py` 检查项重做：新增「主题注册表与组件库一一对应」「组件库源头关
+  （复用 `component_lint`）」「上游署名与授权文件在位」「旧链路资产已清退」四项守卫
+- `assets/templates/config.example.json` 同步新字段；删除 `article.html` /
+  `article.template.html` 两个旧模板
+
+### Fixed
+
+- **「正文 2 万字符」从 P0 阻断降为 P1 提示（WX022）**。上游组件库是「每个元素挂满
+  内联样式 + `<span leaf>` 包裹」的写法，一篇 8700 字纯文本的文章装配出来 4.5 万字符，
+  按旧规则直接卡死，等于新范式根本发不出去。于是先做实测再改规则：
+  **2026-09-17 用 `draft/add` 发 45258 字符 → 返回 `media_id`；`draft/get` 回查得
+  45390 字符、尾部与原文一致 → 完整落库、未截断**（多出的 132 字符是微信自己补的）。
+  官方文档写的是「必须少于 2 万字符」，但接口并未校验。据此：
+  - `preflight.py` WX022 降为 P1，并把依据从「官方硬约束」改为新的第四类
+    「**文档口径，实测未强制**」（该类结论一律带时间戳与测法）
+  - `publish.py` 的 `CONTENT_MAX_CHARS` 硬 `die()` 改为提示，改名 `CONTENT_SOFT_CHARS`；
+    `1MB` 字节数保持 P0（改名 `CONTENT_MAX_BYTES`）
+  - 删除已无意义的 WX101（「达到上限 95%」）
+  - 剩余风险写进文档：**正式发布**（`freepublish` / 后台点发表）是否二次校验字数**未验证**
+- **WX104 从「正文用了 h1~h6」改为「h1~h6 没写内联 font-size」，并降为 P2**。
+  旧规则与上游主题库直接冲突——摸鱼绿的步骤卡组件（`theme-moyu-green.md` 第 349/365/379/661 行）
+  本来就用 `<h4 style="font-size:15px;font-weight:800;color:#111827;margin:0;">`。
+  真正的风险只是没写内联字号时平台默认标题样式顶上来，所以改成按标签逐个检查是否带
+  `font-size`，命中才提示，并给出「照抄组件库写法」的处理办法
+- **`make_assets.py` 改为主题驱动配色**。原来封面硬编码深色底 + 工程橙，主题换成浅色系
+  （如摸鱼绿）后封面色调与正文完全脱节。现在从 `references/theme-<id>.md` 的
+  「设计变量速查表」里解析 `主色调 / 标题色 / 正文色 / 辅助文字 / 极浅底`，
+  支持 `-c config.json`（跟着 config 的 `theme` 走）、`--theme <id>`、`--dark`（回到旧深色版式）；
+  读不到主题时给出提示并回退，不静默出错。`make_flow` 同步支持浅色主题
+- 清理 `with_compliance` / `--no-compliance` 两处死参数（旧合规词库早已移除，传了也没作用，
+  留着会让人误以为还有这类检查）
+
+### Removed
+
+- `scripts/apply_style.py`、`scripts/enhance_content.py`、`assets/styles/*.json`（6 套预设）、
+  `references/style-presets.md`、`assets/templates/article.html`、
+  `assets/templates/article.template.html`
+- `publish.py` 的 `enhance` 子命令与 `--no-enhance` 参数
+
+### Notes
+
+- 上游排版链路为 **AGPL-3.0**，授权原文保留在 `LICENSE-gzh-design`，README / SKILL.md
+  均标注来源与署名，请勿删除。本仓库自有部分（发布链路）仍为 MIT
+- `SKILL.md` 重写为「排版链路 + 发布链路」双段式工作流，排版段完整保留上游的
+  主题选择决策表、智能处理要求、视觉层级与 gotchas
+
 ## [0.4.0] - 2026-09-16
 
 ### Changed

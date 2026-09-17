@@ -8,19 +8,20 @@
 
 用法：
     python publish.py check      # 只验证凭证 + IP 白名单，不发任何内容
-    python publish.py preflight  # 只做发布前体检（字数/图片/排版/合规），不连微信
-    python publish.py enhance    # 只做内容增强（mermaid 渲染 + 代码块重建），不连微信
-    python publish.py draft      # 建草稿（默认，安全）。发请求前会自动增强+体检
+    python publish.py preflight  # 只做发布前体检（接口侧硬约束），不连微信
+    python publish.py draft      # 建草稿（默认，安全）。发请求前自动体检
     python publish.py publish    # 建草稿并立即正式发布（会二次确认）
     python publish.py publish --media-id XXX   # 直接发布草稿箱里已有的某篇，不重复建稿
     python publish.py list       # 列出草稿箱
     python publish.py delete --media-id XXX -y   # 删除指定草稿
     python publish.py token -f   # 强制刷新 access_token
 
-    draft 相关逃生口：
-    --no-enhance     跳过内容增强（mermaid 渲染 + 代码块重建）
+    分工说明：排版与合规由双关卡脚本负责（validate_gzh_html.py 查产物、
+    component_lint.py 查组件库），mermaid 由 render_mermaid.py 在排版前渲染。
+    本脚本只负责"把已经排好的 HTML 送上去"。
+
+    draft 逃生口：
     --no-preflight   跳过发布前体检（不建议）
-    --no-compliance  体检时跳过广告法/导流/金融等合规词扫描
 
 官方接口文档：
     token      GET  /cgi-bin/token
@@ -250,7 +251,7 @@ def upload_cover_material(token, abs_path):
 IMG_LOCAL_RE = re.compile(r'(<img\b[^>]*?\bsrc\s*=\s*["\'])([^"\']+)(["\'])', re.I)
 COMMENT_RE = re.compile(r"<!--.*?-->", re.S)
 # 编辑器 / 预览器注入的记账属性，微信会剥掉未知属性，但它们会先撑大 content
-# 字段的长度、可能撞上 2 万字符上限，所以发送前先剥掉（preflight 同口径处理）
+# 字段的长度、挤占 2 万字符的文档额度，所以发送前先剥掉（preflight 同口径处理）
 EDITOR_ATTR_RE = re.compile(
     r"""\s+data-(?:page-node|node|block|element|editor)[a-z-]*=(?:"[^"]*"|'[^']*')""",
     re.I)
@@ -334,14 +335,16 @@ def cmd_check(cfg, args):
 TITLE_MAX = 32
 AUTHOR_MAX = 16
 DIGEST_MAX = 120
-CONTENT_MAX_CHARS = 20000
+CONTENT_SOFT_CHARS = 20000   # 文档口径。实测接口接受更多且不截断，只提醒不拦
+CONTENT_MAX_BYTES = 1024 * 1024   # 接口硬约束：content < 1MB
 
 
-def run_preflight(cfg_path, with_compliance=True, quiet=False):
+def run_preflight(cfg_path, quiet=False):
     """发布前体检。由同目录的 preflight.py 提供，P0 未通过则中止流程。
 
-    为什么要在建草稿前跑：字数超限、图片超过 1MB、外链图这类问题，
+    为什么要在建草稿前跑：图片超过 1MB、外链图这类问题，
     等微信报错时只知道 errcode，还得回来翻文件；本地先查一遍省一个来回。
+    只查接口侧硬约束，排版问题归 validate_gzh_html.py。
     """
     if not os.path.isfile(os.path.join(HERE, "preflight.py")):
         out("[i] 没找到 preflight.py，跳过体检")
@@ -355,47 +358,22 @@ def run_preflight(cfg_path, with_compliance=True, quiet=False):
         return 0
 
     out("== 发布前体检（draft 自动执行，--no-preflight 可跳过）==")
-    rc = preflight.run(cfg_path, with_compliance=with_compliance, quiet=quiet)
+    rc = preflight.run(cfg_path, quiet=quiet)
     if rc != 0:
         die("体检未通过：上面标 P0 的问题必须先在本地修掉。\n"
             "    确要跳过体检强行建草稿：加 --no-preflight（不建议，微信那一步通常也会失败）")
     return rc
 
 
-def run_enhance(cfg_path, force=False):
-    """内容增强：mermaid 渲染成 PNG、代码块重建为内联样式卡片。
-
-    由 enhance_content.py 提供。draft 自动执行（auto 模式：没有可增强内容
-    就不动文件）。返回 2 表示有渲染失败残留，体检会以 WX216 拦截，不在此中断。
-    """
-    if not os.path.isfile(os.path.join(HERE, "enhance_content.py")):
-        return 0
-    if HERE not in sys.path:
-        sys.path.insert(0, HERE)
-    try:
-        import enhance_content
-    except ImportError as e:
-        out("[i] 内容增强模块加载失败（{}），跳过".format(e))
-        return 0
-    return enhance_content.run(cfg_path, mode="all" if force else "auto")
-
-
 def cmd_draft(cfg, args):
     art = cfg.get("article", {})
     base_dir = os.path.dirname(os.path.abspath(args.config))
-
-    # ---- 内容增强：mermaid/代码块在体检前预处理成公众号兼容形态
-    if getattr(args, "no_enhance", False):
-        out("[i] 已跳过内容增强（--no-enhance）")
-    else:
-        run_enhance(args.config)
 
     # ---- 发布前体检：本地先拦掉会因为平台约束翻车的内容
     if getattr(args, "no_preflight", False):
         out("[i] 已跳过发布前体检（--no-preflight）")
     else:
-        run_preflight(args.config,
-                      with_compliance=not getattr(args, "no_compliance", False))
+        run_preflight(args.config)
 
     # ---- 标题/作者/摘要长度校验（微信的硬限制，超了直接报错更省事）
     title = (art.get("title") or "").strip()
@@ -423,14 +401,17 @@ def cmd_draft(cfg, args):
         out("[i] 剥离了 {} 段 HTML 注释（公众号本身也会过滤，不影响成稿）".format(n_cmt))
 
     # 编辑器会往 HTML 注入记账属性（data-page-node-id 之类）。微信同样会剥掉未知属性，
-    # 但它们会先撑大 content 字段、撞上 2 万字符上限，所以发送前剥掉。
+    # 但它们会先撑大 content 字段、挤占 2 万字符的文档额度，所以发送前剥掉。
     content, n_attr = EDITOR_ATTR_RE.subn("", content)
     if n_attr:
         out("[i] 剥离了 {} 处编辑器注入的记账属性（微信会过滤，不影响成稿）".format(n_attr))
 
-    if len(content) > CONTENT_MAX_CHARS:
-        die("正文 {} 字符，超过 {} 上限".format(len(content), CONTENT_MAX_CHARS))
-    if len(content.encode("utf-8")) > 1024 * 1024:
+    # 2 万字符是文档口径，实测 draft/add 接受 4.5 万且完整落库（见 preflight WX022），
+    # 所以这里只提醒不拦。真正拦的是 1MB 字节数 —— 那条是接口硬约束。
+    if len(content) > CONTENT_SOFT_CHARS:
+        out("[i] 正文 {} 字符，超出文档口径的 {} 字；实测接口接受且不截断，继续"
+            .format(len(content), CONTENT_SOFT_CHARS))
+    if len(content.encode("utf-8")) > CONTENT_MAX_BYTES:
         die("正文超过 1MB 上限")
 
     digest = (art.get("digest") or "").strip()
@@ -537,7 +518,7 @@ def main():
         formatter_class=argparse.RawDescriptionHelpFormatter,
         epilog=__doc__)
     p.add_argument("action",
-                   choices=["check", "preflight", "enhance", "draft", "publish", "list", "delete", "token"],
+                   choices=["check", "preflight", "draft", "publish", "list", "delete", "token"],
                    help="check=自检 / preflight=发布前体检 / draft=建草稿 / "
                         "publish=建草稿并发布 / list=看草稿箱 / "
                         "delete=删草稿（需 --media-id）/ token=刷新凭证")
@@ -551,12 +532,8 @@ def main():
                    help="配合 publish 使用：直接发布这条已存在的草稿，不重新建草稿")
     p.add_argument("--full", action="store_true",
                    help="配合 list 使用：列出完整 media_id（删除指定草稿时要靠它）")
-    p.add_argument("--no-enhance", action="store_true",
-                   help="draft 前不做内容增强（mermaid 渲染 + 代码块重建）")
     p.add_argument("--no-preflight", action="store_true",
-                   help="draft 前不跑发布前体检（不建议，体检能提前拦掉字数/图片/排版问题）")
-    p.add_argument("--no-compliance", action="store_true",
-                   help="体检时跳过广告法/导流/金融等合规词扫描")
+                   help="draft 前不跑发布前体检（不建议，体检能提前拦掉图片/封面问题）")
     p.add_argument("--warn-only", action="store_true",
                    help="配合 preflight 使用：即使有 P0 也返回退出码 0")
     p.add_argument("--json", dest="as_json", action="store_true",
@@ -581,20 +558,9 @@ def main():
         except ImportError as e:
             die("无法加载体检模块 {}：{}".format(os.path.join(HERE, "preflight.py"), e))
         sys.exit(preflight.run(args.config,
-                               with_compliance=not args.no_compliance,
                                warn_only=args.warn_only,
                                as_json=args.as_json,
                                quiet=False))
-
-    if args.action == "enhance":
-        if HERE not in sys.path:
-            sys.path.insert(0, HERE)
-        try:
-            import enhance_content
-        except ImportError as e:
-            die("无法加载内容增强模块 {}：{}".format(
-                os.path.join(HERE, "enhance_content.py"), e))
-        sys.exit(enhance_content.run(args.config, mode="all"))
 
     cfg = load_config(args.config)
 
