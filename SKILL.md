@@ -134,15 +134,20 @@ python <skill>/scripts/render_mermaid.py --list-themes      # 查主题标识
 正文里实际字号 = 图内字号 × 正文宽度 ÷ 图形原始宽度
 ```
 
-所以横排长链（`flowchart LR` 七节点）原始宽 1389px，正文里只剩 7.8px —— 手机上是一团灰。
+所以横排长链（`flowchart LR` 七节点）原始宽 1389px，正文里只剩 3.8px —— 手机上是一团灰。
 **真正的杠杆是换方向或拆图**，不是调大 `--width`。脚本已把这件事自动化：
 
 - 渲染前先量图形原始宽度，正文里字号低于 11px 且换方向能好 1.25 倍以上时，
-  **自动把 `flowchart LR` 改成正交方向**，并在输出里写明 `7.8px → 25.6px`；
+  **自动把 `flowchart LR` 改成正交方向**，并在输出里写明 `3.8px → 12.4px`；
 - 窄图（原始宽度本来就小）反过来**收窄显示宽度**，让字号落在正文惯用的 17px 上下，
   免得满宽拉出一屏 40px 巨字 + 两张屏高；
 - 出图**强制不透明底**（`bgColor=FFFFFF`）。mermaid.ink 默认返回半透明 PNG，
   而微信点开大图是**黑底查看器**，深色文字压在黑底上等于没画。
+
+**"正文宽度"取手机值 328px，不是桌面网页的 677px。** 328 = 360dp 机型 360 − 两侧留白
+16×2（见 `theme_vars.MOBILE_CONTENT_W`，插图与代码块共用这一个数）。早期版本按 677 算，
+把图像在正文里的字号高估近一倍 —— "显示宽 677、正文里 17px"的结论，在手机上其实是
+328、8.6px；同一处错误也让代码块误判"75 列也放得下"，实际手机上要折行。
 
 要改行为：`--font-size` 图内字号、`--target-size` 期望正文字号、`--keep-direction`
 不自动换方向、`--no-size-check` 跳过体检（省一次请求）。
@@ -152,13 +157,26 @@ python <skill>/scripts/render_mermaid.py --list-themes      # 查主题标识
 ```bash
 python <skill>/scripts/highlight_code.py article.md --theme moyu-green -o code.html
 #   --lang python 只取该语言；--style light 出通用库 1b 浅色版
-#   --show-palette --all-themes 打印全部主题的高亮配色（排查"颜色突兀"先看这个）
+#   --scheme calm 回到单色克制版；--wrap 改回折行（不横滑）
+#   --check-widths 只看"哪几行会横滑"，不出 HTML
+#   --show-palette --all-themes 打印全部主题的高亮配色
 ```
 
 配色**从主题库的设计变量速查表推导**，所以 6 套内置主题和任何自定义主题都自动适配，
-不用为每套主题维护一份高亮配色表。三条约束保证"不突兀"：关键词/函数取主色相的邻居
-（+0° / +24°）；深色底上所有 token 明度锁在 0.73~0.82、饱和度 0.30~0.42，全篇只有
-亮度一致这一种变化；只有字符串/数字用 +200° 的低饱和暖色，**运算符与标点不着色**。
+不用为每套主题维护一份高亮配色表。除配色外还有两件事必须由脚本做，手写必错：
+
+- **色彩丰富**：以主色色相为起点铺一圈色环 —— 关键词留在主色相本身（`+0°`，保住主题
+  身份），函数 / 数字 / 字符串 / 内置 / 类型依次 `+35° / +70° / +140° / +195° / +262°`。
+  六个色相同处一个明度带（深色底 `L≈0.68~0.78`）与一个饱和度带（`S≈0.45~0.62`）——
+  **丰富来自色相、秩序来自明度与饱和度**，抽掉色相只看灰度，整块是平的。关键词与类型
+  加粗；**运算符与标点不着色**（给标点上色是"满屏彩点"的主要来源）；
+- **缩进与对齐**：行首空格与连续空格一律写 `&nbsp;`。源码空格会被 HTML 折叠 ——
+  4 空格缩进整层消失、对齐在某一列的行尾注释全挤到代码后面。全角空格 `　` 能缩进但
+  **对不齐列**（宽约 1.67 个半角字符，不是整 2 倍）；
+- **长行横滑，不折行**：外层 `section` 给 `overflow-x:auto`，每行 `<p>` 再内联
+  `white-space:nowrap`（微信会注入 `white-space:normal`，内联样式优先级高于它的任何
+  选择器）。折行会把行尾注释甩到下一行开头，读者分不清它属于哪句；预计超宽时顶栏右侧
+  出「👉 左右滑动」提示 —— 手机上横向滚动条是隐藏的，不提示没人知道能滑。
 
 主色若是墨黑或灰（橄榄手记 `#1e1f23`、石墨极简 `#52525B`），色相是舍入噪声，
 脚本自动改取主题登记的点睛强调色的色相（`#ed7b2f` / `#F97316`）——见
@@ -314,6 +332,7 @@ python <skill>/scripts/publish.py draft -c wechat-publish/config.json
 | `render_mermaid.py article.md --theme X` | 排版前把 ```mermaid 渲染成 PNG，产出工作副本 |
 | `render_mermaid.py --list-themes` | 列出已注册主题标识 |
 | `highlight_code.py article.md --theme X` | 代码围栏 → 按语言着色的代码块组件（零依赖） |
+| `highlight_code.py --check-widths` | 只看"哪几行会横滑"，不出 HTML |
 | `highlight_code.py --show-palette --all-themes` | 打印各主题的高亮配色，排查"颜色突兀" |
 | `validate_gzh_html.py <html>` | **产物关**：禁用标签 / `<span leaf>` / 半角标点 |
 | `component_lint.py <skill>` | **源头关**：扫组件库反模式（改过主题库才需要） |
@@ -375,6 +394,8 @@ python <skill>/scripts/publish.py draft -c wechat-publish/config.json
 - 报 **40001**：token 被别处刷新导致缓存失效，`token -f` 重取。
 - 报 **40007**：封面素材缺失，体检的 `WX040/WX041` 会提前拦。
 - 报 **40005 / 40009**：正文图格式或体积不对，体检的 `WX030/WX031` 会提前拦。
+- **代码块没有缩进、行尾注释全挤到代码后面**：手写时用了源码空格，被 HTML 折叠了（行首空格整层消失、连续空格压成一个）。用 `highlight_code.py` 生成，它会把行首与连续空格转成 `&nbsp;`。
+- **代码块在手机上折行、对齐乱了**：漏了 `overflow-x:auto` + 逐行 `white-space:nowrap`。另外别拿桌面宽度判断"放不放得下"——手机正文只有 328px。
 - **粘贴到公众号后样式全丢**：漏了 `<span leaf="">` 包裹。跑 `validate_gzh_html.py` 定位。
 - **正文图片不显示**：用了外链图。改成 `assets/xxx.png` 本地相对路径，脚本自动上传换链。
 - **正文莫名其妙超限**：先确认是 HTML 长度不是纯文本字数。另外本地编辑器/预览器会注入 `data-page-node-id` 之类记账属性，会把长度撑大——`preflight.py` / `publish.py` / `validate_gzh_html.py` 都会自动剥离，无需手工清理。

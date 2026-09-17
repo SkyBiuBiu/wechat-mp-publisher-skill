@@ -15,6 +15,7 @@
 import argparse
 import re
 import sys
+from html import unescape as html_unescape
 from html.parser import HTMLParser
 
 # (正则, 级别, 说明) —— ERROR 会被公众号编辑器过滤掉或导致样式失效
@@ -44,6 +45,10 @@ HALF_PUNCT = re.compile(r"[一-鿿㐀-䶿][,;!?]")
 ASCII_QUOTE = re.compile(r"[\"']")
 # 代码区特征：等宽字体或 white-space:pre —— 其内半角符号是正常的
 CODE_STYLE = re.compile(r"monospace|white-space\s*:\s*pre|courier|consolas|sf mono", re.I)
+
+# 代码块的一行（等宽字体的 <p>），用于查源码空白被折叠的问题
+CODE_P_RE = re.compile(r"<p\b[^>]*font-family\s*:[^>]*monospace[^>]*>(.*?)</p>",
+                       re.S | re.I)
 
 
 class LeafChecker(HTMLParser):
@@ -96,6 +101,39 @@ class LeafChecker(HTMLParser):
             self.half_punct.append(snippet)
 
 
+def check_code_fidelity(html, warnings):
+    """查代码行里"写错了也不报错、只画错"的空白。
+
+    代码 `<p>` 里用源码空格做缩进或列对齐，会被 HTML 折叠掉：行首空格整层消失
+    （嵌套结构读不出来）、连续空格压成一个（对齐在同一列的行尾注释全挤到代码后面）。
+    这两种坏法在编辑器里看着都是"就是没对齐"，很难反推到空格上，所以这里点出来。
+
+    注意 `&nbsp;` 是**对的**写法：它反转义后是 U+00A0，不是普通空格，下面的正则
+    不会命中它 —— 所以这条检查只会抓真的源码空格。
+    """
+    bad_lead = 0
+    bad_run = []
+    for m in CODE_P_RE.finditer(html):
+        whole, body = m.group(0), m.group(1)
+        if re.search(r"white-space\s*:\s*pre", whole, re.I):
+            continue                      # 显式保留空白，源码空格是对的
+        text = html_unescape(re.sub(r"<[^>]+>", "", body))
+        if re.match(r"[ \t]", text):
+            bad_lead += 1
+        elif re.search(r"[ \t]{2,}", text):
+            bad_run.append(text.strip()[:24] or "(空白行)")
+
+    if bad_lead:
+        warnings.append(
+            f"{bad_lead} 行代码以源码空格开头 —— 行首空格会被 HTML 折叠，"
+            "缩进会整层消失。改用 &nbsp;（跑 highlight_code.py 自动就是对的）")
+    if bad_run:
+        warnings.append(
+            f"{len(bad_run)} 行代码里有连续 2 个以上源码空格 —— 会被压成一个空格，"
+            "靠它对齐的行尾注释会全挤到代码后面。改用 &nbsp;。例："
+            + "；".join(f"「{s}」" for s in bad_run[:3]))
+
+
 def validate(html, name="<input>"):
     errors, warnings = [], []
 
@@ -104,6 +142,8 @@ def validate(html, name="<input>"):
         if hits:
             (errors if level == "ERROR" else warnings).append(
                 f"{msg}（命中 {hits} 处）")
+
+    check_code_fidelity(html, warnings)
 
     checker = LeafChecker()
     try:

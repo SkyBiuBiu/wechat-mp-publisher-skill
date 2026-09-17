@@ -84,13 +84,13 @@ def registered_themes():
     return rows
 
 
-def render_block(tid, code_file, lang, style):
+def render_block(tid, code_file, lang, style, scheme):
     cmd = [sys.executable, HL]
     if code_file:
         cmd += ["--code-file", code_file]
     else:
         cmd += ["-"]
-    cmd += ["--lang", lang, "--theme", tid, "--style", style]
+    cmd += ["--lang", lang, "--theme", tid, "--style", style, "--scheme", scheme]
     if code_file:
         p = subprocess.run(cmd, capture_output=True, cwd=ROOT)
     else:
@@ -110,10 +110,12 @@ PAGE = """<!DOCTYPE html>
 body{{margin:0;padding:32px 24px 64px;background:#F1F5F9;
 font-family:-apple-system,BlinkMacSystemFont,'PingFang SC','Microsoft YaHei',sans-serif;
 color:#0F172A;-webkit-font-smoothing:antialiased;}}
-.wrap{{max-width:760px;margin:0 auto;}}
-h1{{font-size:22px;margin:0 0 8px;letter-spacing:-0.2px;}}
-.lead{{font-size:14px;color:#475569;line-height:1.85;margin:0 0 4px;}}
-.lead code{{background:#E2E8F0;padding:1px 5px;border-radius:3px;font-size:13px;
+/* 页面按**手机正文宽度**排版，不是按桌面。用 760px 排版会得出
+   "75 列也放得下、不用滑"的错误结论 —— 手机上正文只有 328px。 */
+.wrap{{max-width:328px;margin:0 auto;}}
+h1{{font-size:18px;margin:0 0 8px;letter-spacing:-0.2px;line-height:1.5;}}
+.lead{{font-size:13px;color:#475569;line-height:1.85;margin:0 0 4px;}}
+.lead code{{background:#E2E8F0;padding:1px 4px;border-radius:3px;font-size:12px;
 font-family:Consolas,Monaco,monospace;}}
 .case{{margin:36px 0 0;}}
 .case h2{{font-size:15px;margin:0 0 3px;}}
@@ -122,10 +124,12 @@ font-weight:400;margin-left:6px;}}
 .note{{font-size:13px;color:#64748B;margin:0 0 10px;line-height:1.7;}}
 </style></head><body><div class="wrap">
 <h1>代码块按语言着色 · 同一段代码 × {n} 套主题</h1>
-<p class="lead">配色由主题库的「设计变量速查表」推导：关键词取主色相同色相、函数取
-+24°，字符串与数字用 +200° 的低饱和暖色，<strong>运算符与标点不着色</strong>；
-深色底上所有 token 明度锁在 <code>0.73~0.82</code>、饱和度
-<code>0.30~0.42</code> —— 全篇只有「亮度一致」这一种变化，所以不扎眼。
+<p class="lead">本页宽度就是手机正文宽度 328px，所以每一块代码都是它在手机上的真实样子
+—— 超宽的那几块会横滑（顶栏右侧有「👉 左右滑动」），而不是折行。</p>
+<p class="lead">配色由主题库的「设计变量速查表」推导：<strong>关键词留在主色相本身</strong>
+（保住主题身份），函数 / 数字 / 字符串 / 内置 / 类型依次取 +35° / +70° / +140° /
++195° / +262°；六个色相同处一个明度带（<code>L≈0.68~0.78</code>）与一个饱和度带
+（<code>S≈0.45~0.62</code>）—— 丰富来自色相，秩序来自明度与饱和度。
 主色是墨黑/灰的主题（色相不可信）会自动改取它登记的点睛强调色。</p>
 {body}
 </div></body></html>
@@ -143,6 +147,8 @@ def main():
     ap.add_argument("--lang", default="python", help="语言标识，默认 python")
     ap.add_argument("--style", choices=["dark", "light"], default="dark",
                     help="dark=通用库 1a（默认）/ light=1b")
+    ap.add_argument("--scheme", choices=["rich", "calm"], default="rich",
+                    help="rich=色环配色（默认）/ calm=单色克制版")
     args = ap.parse_args()
 
     if args.themes:
@@ -157,7 +163,7 @@ def main():
 
     chunks = []
     for tid, cn in pairs:
-        block = render_block(tid, args.code_file, args.lang, args.style)
+        block = render_block(tid, args.code_file, args.lang, args.style, args.scheme)
         if block is None:
             continue
         # 剥掉溯源注释，预览页不需要
@@ -178,7 +184,8 @@ def main():
         PAGE.format(n=len(chunks), body="\n".join(chunks)))
     print("[OK] 已写出 {}（{} 套主题，语言 {}，{}）".format(
         args.out, len(chunks), args.lang, args.style))
-    print("     → 浏览器打开翻一遍：换主题该换色相；改明度/饱和度常量后回来看有没有扎眼的")
+    print("     → 浏览器打开翻一遍：换主题该换色相；超宽的行该横滑而不是折行；")
+    print("       改明度/饱和度常量后回来看有没有扎眼的")
 
 
 if __name__ == "__main__":

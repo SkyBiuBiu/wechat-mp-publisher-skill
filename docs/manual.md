@@ -243,30 +243,48 @@ python scripts/render_mermaid.py article.md --theme moyu-green
 
 | 图 | 原始宽度 | 正文里字号 | 观感 |
 |---|---|---|---|
-| `flowchart LR` 七节点 | 1389px | 7.8px | 手机上一团灰 |
-| 同图换 `flowchart TD` | 423px | 25.6px | 清楚 |
+| `flowchart LR` 七节点 | 1389px | 3.8px | 手机上一团灰 |
+| 同图换 `flowchart TD` | 423px | 12.4px | 读得清 |
+
+上表的"正文宽度"取**手机**值 328px（360dp 机型 360 − 两侧留白 16×2），不是桌面网页的
+677px —— 按 677 算会把图像字号高估近一倍，早期版本的"17px、很清楚"就是这么来的。
+常量在 `theme_vars.MOBILE_CONTENT_W`，插图与代码块共用一处。
 
 脚本已自动处理：量出原始宽度后，字号低于 11px 且换方向能好 1.25 倍以上就**自动换方向**
-并在输出里写明 `7.8px → 25.6px`；窄图反过来**收窄显示宽度**（让字号落在 17px 上下，
+并在输出里写明 `3.8px → 12.4px`；窄图反过来**收窄显示宽度**（让字号落在 17px 上下，
 免得满宽拉出 40px 巨字 + 两张屏高的图）。出图**强制不透明底** —— mermaid.ink 默认给半透明
 PNG，而微信点开大图是**黑底查看器**，深色文字压在黑底上等于没画。相关开关：`--font-size`、
 `--target-size`、`--keep-direction`、`--no-size-check`。
 
 **代码块不转图片**：用通用库 1a 深色 / 1b 浅色代码块组件，每行一个 `<p style="margin:0">`，
-缩进用全角空格 `　`，**绝不用 `white-space:pre`**。文字可选中，手机上长按代码即可复制
-（公众号剥 `<script>`，JS 复制按钮活不下来，长按复制是唯一可靠路径）。
+**绝不用 `white-space:pre`**。文字可选中，手机上长按代码即可复制（公众号剥 `<script>`，
+JS 复制按钮活不下来，长按复制是唯一可靠路径）。
+
+代码块里有两个"看着小事、坏了很难查"的点：
+
+- **缩进与对齐用 `&nbsp;`**，不要用源码空格。HTML 会折叠空格：行首 4 空格整层消失
+  （嵌套结构读不出来），作者对齐在某一列的行尾注释全挤到代码后面。全角空格 `　` 能缩进
+  但对不齐列 —— 它宽约 1.67 个半角字符，不是整 2 倍；
+- **长行横滑，不折行**：外层 `section` 给 `overflow-x:auto`，每行 `<p>` 再内联
+  `white-space:nowrap`。微信会往页面注入 `white-space:normal`，内联样式优先级高于它的
+  任何选择器，所以这一层必须内联。折行的坏处是行尾注释被甩到下一行开头，读者分不清它
+  属于哪一句。手机上横向滚动条是隐藏的，所以脚本在预计超宽时会在顶栏右侧加
+  「👉 左右滑动」提示（与主题库横滑卡组的说法一致）。
 
 **代码要按语言着色**，否则超过十行就糊成一片灰。跑脚本，别手写色值：
 
 ```bash
 python scripts/highlight_code.py article.md --theme moyu-green -o code.html
+python scripts/highlight_code.py --check-widths                # 哪几行会横滑
 python scripts/highlight_code.py --show-palette --all-themes   # 看各主题配色
 ```
 
-配色从主题库的设计变量速查表推导，6 套内置主题与自定义主题都自动适配 —— 关键词/函数取
-主色相的邻居（+0° / +24°），字符串/数字用 +200° 的低饱和暖色，**运算符与标点不着色**。
-着色后的 markup 是"外层带色、内层仍 `<span leaf="">`"，见
-[`references/common-components.md`](../references/common-components.md) 的 1a+/1b+ 节。
+配色从主题库的设计变量速查表推导，6 套内置主题与自定义主题都自动适配 —— 以主色色相为
+起点铺一圈色环：关键词留在主色相本身（`+0°`，保住主题身份），函数 / 数字 / 字符串 / 内置 /
+类型依次 `+35° / +70° / +140° / +195° / +262°`，六个色相同处一个明度带（深色底
+`L≈0.68~0.78`）与一个饱和度带（`S≈0.45~0.62`）；关键词与类型加粗，**运算符与标点不着色**。
+想要回早期的单色克制版：`--scheme calm`。着色后的 markup 是"外层带色、内层仍
+`<span leaf="">`"，见 [`references/common-components.md`](../references/common-components.md) 的 1a+/1b+ 节。
 
 更细的标签与样式约束见 [`references/wechat-api-reference.md`](../references/wechat-api-reference.md) 第五节。
 

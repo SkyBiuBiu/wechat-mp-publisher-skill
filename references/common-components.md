@@ -15,22 +15,41 @@
 ### 1a. 深色代码块（默认，技术感强，适配所有主题）
 
 ```html
-<section style="margin:0 0 20px;border-radius:8px;overflow:hidden;background:#1E293B;box-shadow:0 4px 16px -8px rgba(15,23,42,0.4);">
-  <section style="display:flex;align-items:center;padding:9px 14px;background:#0F172A;">
+<section style="margin:0 0 20px;border-radius:8px;overflow:hidden;background:#1E293B;border-left:3px solid #059669;box-shadow:0 4px 16px -8px rgba(15,23,42,0.4);">
+  <section style="display:flex;align-items:center;padding:9px 14px;background:#172B25;">
     <span style="display:inline-block;width:10px;height:10px;border-radius:50%;background:#FF5F56;margin-right:7px;font-size:0;line-height:0;overflow:hidden;">.</span>
     <span style="display:inline-block;width:10px;height:10px;border-radius:50%;background:#FFBD2E;margin-right:7px;font-size:0;line-height:0;overflow:hidden;">.</span>
     <span style="display:inline-block;width:10px;height:10px;border-radius:50%;background:#27C93F;font-size:0;line-height:0;overflow:hidden;">.</span>
     <span style="margin-left:12px;font-size:12px;color:#64748B;font-family:Consolas,Monaco,monospace;letter-spacing:1px;"><span leaf="">python</span></span>
+    <span style="margin-left:auto;font-size:11px;color:#9CA3AF;white-space:nowrap;"><span leaf="">👉 左右滑动</span></span>
   </section>
-  <section style="padding:11px 14px;">
-    <p style="margin:0;font-family:'SF Mono',Consolas,Monaco,monospace;font-size:13px;line-height:1.6;color:#E2E8F0;"><span leaf="">def make_skill(name):</span></p>
-    <p style="margin:0;font-family:'SF Mono',Consolas,Monaco,monospace;font-size:13px;line-height:1.6;color:#E2E8F0;"><span leaf="">　　return f"已生成 {name}"</span></p>
-    <p style="margin:0;font-family:'SF Mono',Consolas,Monaco,monospace;font-size:13px;line-height:1.6;color:#E2E8F0;"><span leaf="">print(make_skill("gzh-design"))</span></p>
+  <section style="padding:11px 14px;overflow-x:auto;-webkit-overflow-scrolling:touch;white-space:nowrap;">
+    <p style="margin:0;font-family:'SF Mono',Consolas,Monaco,monospace;font-size:13px;line-height:1.6;color:#E2E8F0;white-space:nowrap;"><span leaf="">def make_skill(name):</span></p>
+    <p style="margin:0;font-family:'SF Mono',Consolas,Monaco,monospace;font-size:13px;line-height:1.6;color:#E2E8F0;white-space:nowrap;"><span leaf="">&nbsp;&nbsp;&nbsp;&nbsp;return f"已生成 {name}"</span></p>
+    <p style="margin:0;font-family:'SF Mono',Consolas,Monaco,monospace;font-size:13px;line-height:1.6;color:#E2E8F0;white-space:nowrap;"><span leaf="">print(make_skill("gzh-design"))</span></p>
   </section>
 </section>
 ```
 
-要点（**关键，避免大段空白**）：① 顶栏三色圆点 + 语言名（无语言可删该 span）；② **每行代码用一个 `<p style="margin:0;...">`，不要用 `white-space:pre`**——否则 HTML 源码里 span 前的缩进和行间换行会被原样渲染成大左缩进 + 空行；③ 需要缩进时在 span 文字里用全角空格 `　`（不要靠源码空格）；④ 行距只靠 `line-height:1.6` 控制，padding 用 `11px 14px`，保持紧凑；⑤ 长行会自动换行，不溢出。
+要点（**关键，避免大段空白与折行错位**）：
+
+① 顶栏三色圆点 + 语言名（无语言可删该 span）；顶栏底色往主题色相偏一点（`#172B25` 是摸鱼绿的），
+不用所有主题共用一个 `#0F172A`；
+② **每行代码用一个 `<p style="margin:0;...">`，不要用 `white-space:pre`**——否则 HTML 源码里
+span 前的缩进和行间换行会被原样渲染成大左缩进 + 空行；
+③ **行首空格与连续空格一律写 `&nbsp;`**。这是唯一能同时保住缩进**和列对齐**的写法：
+源码空格会被 HTML 折叠（4 空格缩进整层消失、对齐在某一列的行尾注释全挤到代码后面），
+全角空格 `　` 能缩进但对不齐列（它比半角字符宽约 1.67 倍，不是整 2 倍）；
+④ **长行横滑，不折行**：外层 `section` 给 `overflow-x:auto;-webkit-overflow-scrolling:touch;white-space:nowrap;`，
+每行 `<p>` 再内联一次 `white-space:nowrap` —— 微信会往页面注入 `white-space:normal`，
+内联样式优先级高于它的任何选择器，这一层是防它把横滑改回折行；
+⑤ 预计超宽时顶栏右侧给「👉 左右滑动」提示（与主题库横滑卡组的说法一致）——
+手机上横向滚动条是隐藏的，不提示读者根本不知道能滑；
+⑥ `border-left:3px solid` 换当前主题主色，让"这块是哪个主题的代码"一眼可辨；
+⑦ 行距只靠 `line-height:1.6` 控制，padding 用 `11px 14px`，保持紧凑。
+
+> 手写这几条很容易漏（尤其 ③ 的 `&nbsp;`），所以正篇文章的代码块都应该由
+> `scripts/highlight_code.py` 生成，见下面 1a+ 节。
 
 ### 1b. 浅色代码块（适配浅色温和主题，如玫瑰粉/天蓝/焦糖棕）
 
@@ -39,13 +58,15 @@
   <section style="padding:7px 14px;border-bottom:1px solid #E5E7EB;">
     <span style="font-size:12px;color:#9CA3AF;font-family:Consolas,Monaco,monospace;letter-spacing:1px;"><span leaf="">bash</span></span>
   </section>
-  <section style="padding:11px 14px;">
-    <p style="margin:0;font-family:'SF Mono',Consolas,Monaco,monospace;font-size:13px;line-height:1.6;color:#24292F;"><span leaf="">npx skills add gzh-design</span></p>
+  <section style="padding:11px 14px;overflow-x:auto;-webkit-overflow-scrolling:touch;white-space:nowrap;">
+    <p style="margin:0;font-family:'SF Mono',Consolas,Monaco,monospace;font-size:13px;line-height:1.6;color:#24292F;white-space:nowrap;"><span leaf="">npx skills add gzh-design</span></p>
   </section>
 </section>
 ```
 
-（左竖条 `#DC2626` 换成当前主题主色；多行同 1a：每行一个 `<p style="margin:0">`，不用 `white-space:pre`，缩进用全角空格 `　`。）
+（左竖条 `#DC2626` 换成当前主题主色；多行同 1a：每行一个 `<p style="margin:0">`，不用 `white-space:pre`，
+缩进与对齐用 `&nbsp;`，行内也内联 `white-space:nowrap`。超宽提示要把顶栏排成
+`display:flex;align-items:center` 才能把提示推到右侧。）
 
 ### 1a+/1b+. 按语言着色（在 1a / 1b 的结构上叠一层 token 颜色）
 
@@ -53,29 +74,39 @@
 读不出结构。给 token 上色只需在原结构上把文本再包一层：**着色包外层、`<span leaf="">` 仍在内层**：
 
 ```html
-<p style="margin:0;font-family:'SF Mono',Consolas,Monaco,monospace;font-size:13px;line-height:1.6;color:#E2E8F0;">
-  <span style="color:#A1D9C7;"><span leaf="">for</span></span><span leaf=""> step </span><span style="color:#A1D9C7;"><span leaf="">in</span></span><span leaf=""> </span><span style="color:#9FD1D6;"><span leaf="">range</span></span><span leaf="">(max_steps):</span>
+<p style="margin:0;font-family:'SF Mono',Consolas,Monaco,monospace;font-size:13px;line-height:1.6;color:#E2E8F0;white-space:nowrap;">
+  <span style="color:#94E6CC;font-weight:bold;"><span leaf="">for</span></span><span leaf=""> step </span><span style="color:#94E6CC;font-weight:bold;"><span leaf="">in</span></span><span leaf=""> </span><span style="color:#DFA4B8;"><span leaf="">range</span></span><span leaf="">(max_steps):</span>
 </p>
 ```
+
+（`#94E6CC` 是摸鱼绿的关键词色、`#DFA4B8` 是内置函数色，**这两个值别抄** —— 下面这段是你的。）
 
 **不要手写这些色值**，跑脚本，配色由主题推导：
 
 ```bash
 python scripts/highlight_code.py article.md --theme moyu-green -o code.html
 python scripts/highlight_code.py --show-palette --all-themes   # 看各主题的配色
+python scripts/highlight_code.py article.md --check-widths     # 哪几行会横滑
 ```
 
 为什么必须由脚本推导：手写必然出现"这套主题用了这个绿、下套主题忘了改"的漂移，而且
 每篇文章都要重新编一遍色值。脚本从主题库的「设计变量速查表」里取色相，6 套内置主题与
 任何自定义主题（见 `theme-generator.md`）都自动适配。
 
-三条"不突兀"的硬约束（改配色时守住）：
+**色彩丰富但不突兀**，靠的是把两件事分开（改配色时守住）：
 
-1. **同族**：关键词取主色相同色相，函数取主色 +24°，整块代码的主旋律就是主题色本身；
-2. **统一明度**：深色底上所有 token 明度锁在 `L≈0.73~0.82`、饱和度 `0.30~0.42`，
-   全篇只有"亮度一致"这一种变化，不会出现某个 token 扎眼；
-3. **只留一个暖色**：字符串/数字用主色 +200°（近似互补）的低饱和暖色，全文仅此一处
-   对比色。**运算符与标点不着色**，避免满屏彩点。
+1. **丰富来自色相**：以主题主色的色相为起点铺一圈色环 —— 关键词留在主色相本身
+   （`+0°`，保住主题身份），函数 / 数字 / 字符串 / 内置 / 类型依次取
+   `+35° / +70° / +140° / +195° / +262°`。早期版本把全部 token 压在主色相 ±24° 内，
+   结果整块糊成一个色 —— 这是这一版改掉的核心问题；
+2. **秩序来自明度与饱和度**：深色底上六个色相同处一个明度带 `L≈0.68~0.78`、
+   一个饱和度带 `S≈0.45~0.62`，所以色相虽多、亮度是一个。判据不是"好不好看"，
+   而是"抽掉色相看灰度，整块是不是平的"；
+3. **关键词与类型加粗**，结构在彩色里立得住；**运算符与标点仍然不着色** ——
+   给标点上色是"满屏彩点"的主要来源。
+
+配色方案另有 `--scheme calm`：回到早期的单色克制版（只有关键词/函数/字符串/数字着色、
+全篇一个对比色），适合留白禅意这类本来就要素的主题。
 
 支持 python / bash / json / javascript / yaml / sql / dockerfile 及 C 系语言（go/rust/java…），
 其余标识按 C 系处理，`text`/`prompt`/`md` 等不着色。浅色主题用 `--style light` 出 1b 版。
@@ -83,6 +114,12 @@ python scripts/highlight_code.py --show-palette --all-themes   # 看各主题的
 > 主色是墨黑或灰的主题（橄榄手记 `#1e1f23`、石墨极简 `#52525B`）色相不可信，脚本会自动
 > 改取主题登记的点睛强调色（`#ed7b2f` / `#F97316`）的色相。判据是通道差而非 HSL 饱和度：
 > `#1e1f23` 的 HSL 饱和度有 0.077 看着"有一点彩"，实际通道差只有 5/255，纯属舍入噪声。
+
+> 想换回折行（不横滑）：`--wrap`。**只在读者确实不需要列对齐时用** —— 行尾对齐的注释被
+> 折到下一行后，读者会分不清它属于哪一句。
+
+改配色后回归看 `python tools/make_code_preview.py`（同一段代码 × 六套主题，页面按手机
+正文宽度 328px 排版，横滑与否在这里就能看出来）。
 
 ### 1c. 行内代码（正文中的 `code` 短片段）
 
