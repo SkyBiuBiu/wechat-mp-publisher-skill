@@ -78,10 +78,12 @@
 ## 组件 3 前言导读区域（极简目录）
 
 > 无色块目录，用细线分隔，数字编号低调呈现。三列等宽，纯文字 + 细线底边。
+>
+> **窄屏硬规矩**：288px 手机上每列内宽只有约 **62px**（13px 字号一行只放 4~5 个字）。要点文字必须 **≤6 字**（最多两行、三列等高）；超过就删字，别指望折行——折成三行整排就参差。另外章节英文标签（`01 · CHAPTER ONE`，10px/字距 4px）保持 **≤12 字符**，否则 288px 下会顶满溢出。
 
 ```html
 <section style="padding: 0 16px 48px;">
-  <p style="font-size: 11px;color: #A3A3A3;margin: 0 0 20px;letter-spacing: 2px;text-transform: uppercase;">
+  <p style="font-size: 11px;color: #A3A3A3;margin: 0 0 20px;letter-spacing: 2px;white-space:nowrap;text-transform: uppercase;">
     <span leaf="">本文脉络</span>
   </p>
   <section style="border-top: 1px solid #E8E8E8;">
@@ -125,7 +127,7 @@
 
 ```html
 <section style="margin-top: 64px;margin-bottom: 32px;padding: 0 16px;">
-  <p style="font-size: 10px;color: #4A5D52;font-weight: 600;letter-spacing: 4px;margin: 0 0 10px;text-transform: uppercase;">
+  <p style="font-size: 10px;color: #4A5D52;font-weight: 600;letter-spacing: 4px;white-space:nowrap;margin: 0 0 10px;text-transform: uppercase;">
     <span leaf="">01 · CHAPTER ONE</span>
   </p>
   <h3 style="font-family: 'Noto Serif SC', Georgia, 'Times New Roman', serif;font-size: 22px;font-weight: 700;color: #2B2B2B;margin: 0 0 16px;letter-spacing: 0.5px;line-height: 1.4;">
@@ -143,7 +145,7 @@
 **结语章节变体**（编号改 ∞，英文改 POSTSCRIPT）：
 
 ```html
-<p style="font-size: 10px;color: #4A5D52;font-weight: 600;letter-spacing: 4px;margin: 0 0 10px;text-transform: uppercase;">
+<p style="font-size: 10px;color: #4A5D52;font-weight: 600;letter-spacing: 4px;white-space:nowrap;margin: 0 0 10px;text-transform: uppercase;">
   <span leaf="">∞ · POSTSCRIPT</span>
 </p>
 ```
@@ -292,7 +294,7 @@
 
 ```html
 <section style="margin: 0 16px 32px;padding: 18px 20px;border-left: 2px solid #4A5D52;">
-  <p style="font-size: 10px;color: #4A5D52;font-weight: 600;letter-spacing: 2px;margin: 0 0 8px;text-transform: uppercase;">
+  <p style="font-size: 10px;color: #4A5D52;font-weight: 600;letter-spacing: 2px;white-space:nowrap;margin: 0 0 8px;text-transform: uppercase;">
     <span leaf="">NOTE</span>
   </p>
   <p style="font-size: 14px;color: #525252;margin: 0;line-height: 1.9;">
@@ -409,7 +411,7 @@
   <section style="text-align: center;margin: 48px 0 40px;">
     <section style="display: flex;align-items: center;justify-content: center;">
       <span style="height: 1px;width: 48px;background: #E8E8E8;margin-right: 16px;"></span>
-      <span style="font-size: 10px;color: #A3A3A3;letter-spacing: 4px;font-weight: 400;"><span leaf="">END</span></span>
+      <span style="font-size: 10px;color: #A3A3A3;letter-spacing: 4px;white-space:nowrap;font-weight: 400;"><span leaf="">END</span></span>
       <span style="height: 1px;width: 48px;background: #E8E8E8;margin-left: 16px;"></span>
     </section>
   </section>

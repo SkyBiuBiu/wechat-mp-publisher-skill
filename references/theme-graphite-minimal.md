@@ -64,7 +64,7 @@
 
 ```html
 <section style="margin:10px 10px 40px;padding:32px 24px 24px;border-top:1px solid #E4E4E7;border-bottom:1px solid #E4E4E7;background:#FFFFFF;">
-  <p style="font-size:11px;color:#A1A1AA;letter-spacing:2px;margin:0 0 18px;font-weight:400;">
+  <p style="font-size:11px;color:#A1A1AA;letter-spacing:2px;white-space:nowrap;margin:0 0 18px;font-weight:400;">
     <span leaf="">QUOTE</span>
   </p>
   <p style="font-size:18px;font-weight:700;color:#27272A;margin:0 0 8px;line-height:1.7;letter-spacing:0.5px;">
@@ -85,10 +85,12 @@
 ## 组件 3 前言导读区域（本文看点，三列极简线框目录卡）
 
 > 3 个及以上章节时生成。上方极细线 + 极浅灰底，石墨灰编号 + 深炭标题，纯灰阶无橙色，大留白。展示**精选 3 个核心看点**，不是全量章节列表。
+>
+> **窄屏硬规矩**：288px 手机上每张卡内宽只有约 **60px**（13px 字号一行只放 4~5 个字）。{{看点}} 必须 **≤6 字**（最多两行、三卡等高）；超过 6 字就删字，别指望折行——折成三行整排就参差，实测被当 bug 反馈。把握不准时改用上下堆叠的单列清单（每行 `01 {{看点}}`）替代三列。
 
 ```html
 <section style="padding:0 10px 40px;">
-  <p style="font-size:11px;color:#A1A1AA;margin:0 0 16px;letter-spacing:2px;">
+  <p style="font-size:11px;color:#A1A1AA;margin:0 0 16px;letter-spacing:2px;white-space:nowrap;">
     <span leaf="">本文看点</span>
   </p>
   <section style="display:flex;justify-content:space-between;">
@@ -135,7 +137,7 @@
       <span leaf="">01</span>
     </p>
     <section style="margin-top:-8px;">
-      <p style="font-size:10px;color:#A1A1AA;font-weight:500;letter-spacing:3px;margin:0 0 6px;text-transform:uppercase;">
+      <p style="font-size:10px;color:#A1A1AA;font-weight:500;letter-spacing:3px;white-space:nowrap;margin:0 0 6px;text-transform:uppercase;">
         <span leaf="">{{ENGLISH TAG}}</span>
       </p>
       <h3 style="font-size:20px;font-weight:800;color:#27272A;margin:0;letter-spacing:0.5px;line-height:1.4;">
@@ -277,7 +279,7 @@
 
 ```html
 <section style="background:#FAFAFA;border:1px solid #E4E4E7;padding:20px 22px;margin:0 10px 28px;">
-  <p style="font-size:11px;color:#A1A1AA;margin:0 0 8px;letter-spacing:2px;font-weight:500;">
+  <p style="font-size:11px;color:#A1A1AA;margin:0 0 8px;letter-spacing:2px;white-space:nowrap;font-weight:500;">
     <span leaf="">REFERENCE</span>
   </p>
   <p style="font-size:15px;color:#3F3F46;margin:0;line-height:1.8;text-align:justify;">
@@ -342,7 +344,7 @@
 
 ```html
 <section style="background:#FAFAFA;border-top:2px solid #27272A;padding:18px 22px;margin:0 10px 24px;">
-  <p style="font-size:11px;color:#A1A1AA;margin:0 0 10px;letter-spacing:2px;font-weight:500;">
+  <p style="font-size:11px;color:#A1A1AA;margin:0 0 10px;letter-spacing:2px;white-space:nowrap;font-weight:500;">
     <span leaf="">NOTE</span>
   </p>
   <p style="font-size:14px;color:#52525B;margin:0;line-height:1.8;">
@@ -572,7 +574,7 @@ GIF 动图角标改极简描边胶囊：边框与字色用石墨主色 `#52525B`
   <section style="text-align:center;margin:0 0 36px;">
     <section style="display:flex;align-items:center;justify-content:center;">
       <span style="height:1px;width:48px;background:#E4E4E7;margin-right:16px;"><span leaf=""><br></span></span>
-      <span style="font-size:10px;color:#A1A1AA;letter-spacing:4px;font-weight:500;"><span leaf="">END</span></span>
+      <span style="font-size:10px;color:#A1A1AA;letter-spacing:4px;white-space:nowrap;font-weight:500;"><span leaf="">END</span></span>
       <span style="height:1px;width:48px;background:#E4E4E7;margin-left:16px;"><span leaf=""><br></span></span>
     </section>
   </section>

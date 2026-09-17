@@ -2,8 +2,10 @@
 """微信公众号 HTML 合规校验器。
 
 把 SKILL.md 里"必须遵守的平台限制"从模型自觉变成确定性兜底。
-排版生成后必跑：检查禁用标签/属性/样式，并核查文字节点是否用
-<span leaf=""> 包裹（公众号编辑器粘贴后保持样式的关键）。
+排版生成后必跑：检查禁用标签/属性/样式，核查文字节点是否用
+<span leaf=""> 包裹（公众号编辑器粘贴后保持样式的关键），
+并做窄屏体检（固定宽度超 288px、小字大字距未 nowrap、代码块横滑结构缺失等——
+这些坏法在桌面编辑器里看不出，到窄屏手机上才炸）。
 
 用法:
     validate_gzh_html.py <file.html>
@@ -49,6 +51,85 @@ CODE_STYLE = re.compile(r"monospace|white-space\s*:\s*pre|courier|consolas|sf mo
 # 代码块的一行（等宽字体的 <p>），用于查源码空白被折叠的问题
 CODE_P_RE = re.compile(r"<p\b[^>]*font-family\s*:[^>]*monospace[^>]*>(.*?)</p>",
                        re.S | re.I)
+
+# —— 窄屏体检（warning 级）——
+# 手机正文最窄按 288px 算（320dp 机型），360dp 是 328px；桌面 677px 只是网页 max-width。
+# 下面这些坏法在桌面编辑器里完全看不出来，到窄屏手机上才炸：眉题溢出、代码块被微信
+# 注入的 white-space:normal 改回折行、固定宽度元素顶出边界等。
+STYLE_ATTR_RE = re.compile(r'style\s*=\s*"([^"]*)"', re.I)
+FS_RE = re.compile(r"font-size\s*:\s*(\d+(?:\.\d+)?)px", re.I)
+LS_RE = re.compile(r"letter-spacing\s*:\s*(\d+(?:\.\d+)?)px", re.I)
+NOWRAP_RE = re.compile(r"white-space\s*:\s*nowrap", re.I)
+FIXED_W_RE = re.compile(r"(?<![-\w])width\s*:\s*(\d+(?:\.\d+)?)px", re.I)
+PRE_RE = re.compile(r"white-space\s*:\s*pre\b", re.I)
+OVERFLOW_X_RE = re.compile(r"overflow-x\s*:\s*(?:auto|scroll)", re.I)
+MOBILE_MIN_W = 288  # 320dp 手机正文宽度下限
+
+
+def check_narrow_screen(html, warnings):
+    """窄屏适配体检：拦截"编辑器里看不出、手机上才炸"的排版坏法。
+
+    1) 固定 width 超过 288px —— 窄屏手机上直接横向溢出（max-width 不受影响）；
+    2) 小字号大字距的文字没加 nowrap —— 288px 下眉题/标签行折行或把同行元素顶出边界；
+    3) 代码块用了 white-space:pre —— 微信会重写，缩进变巨左缩进 + 空行；
+    4) 等宽代码行没内联 nowrap —— 微信注入 white-space:normal 会把横滑改回折行；
+    5) 有代码块但全文没有 overflow-x:auto —— 长行必然折行。
+    """
+    wide = []
+    kicker = 0
+    pre_hit = 0
+    no_nowrap = 0
+    has_mono = False
+
+    for m in STYLE_ATTR_RE.finditer(html):
+        style = m.group(1)
+        if PRE_RE.search(style):
+            pre_hit += 1
+        w = FIXED_W_RE.search(style)
+        # 同 style 里带 max-width 的（如插图 width:328px;max-width:100%）会被容器收窄，不算溢出
+        if w and float(w.group(1)) > MOBILE_MIN_W \
+                and not re.search(r"max-width\s*:", style, re.I):
+            wide.append(w.group(1) + "px")
+        fs = FS_RE.search(style)
+        ls = LS_RE.search(style)
+        if fs and ls and float(fs.group(1)) <= 12 and float(ls.group(1)) >= 2 \
+                and not NOWRAP_RE.search(style):
+            kicker += 1
+
+    code_ps = list(CODE_P_RE.finditer(html))
+    has_mono = bool(code_ps) or bool(re.search(r"font-family\s*:[^>]*monospace", html, re.I))
+    for m in code_ps:
+        whole = m.group(0)      # 含 <p ...> 开标签，nowrap/pre 的内联样式在这里
+        text = html_unescape(re.sub(r"<[^>]+>", "", m.group(1)))
+        if not text.strip():
+            continue
+        if PRE_RE.search(whole):
+            continue            # 显式 pre 由上一条 warning 单独报告
+        # 单行短代码不要求 nowrap；较长且无缩进的行没加 nowrap，横滑结构就是缺失的
+        if len(text) > 24 and not NOWRAP_RE.search(whole):
+            no_nowrap += 1
+
+    if wide:
+        warnings.append(
+            f"{len(wide)} 处固定 width 超过 {MOBILE_MIN_W}px（{'、'.join(wide[:5])}）—— "
+            "最窄的手机（320dp，正文 288px）上会横向溢出。改用百分比/max-width，或缩到 288px 以内")
+    if kicker:
+        warnings.append(
+            f"{kicker} 处『font-size ≤12px 且 letter-spacing ≥2px』的文字没加 white-space:nowrap —— "
+            "288px 窄屏上眉题/标签行会折行或把同行元素挤出边界。加 nowrap 并核对字数"
+            "（字距 2px ≤12 字符、4px ≤8 字符）")
+    if pre_hit:
+        warnings.append(
+            f"{pre_hit} 处用了 white-space:pre —— 微信会重写空白，代码块出现巨左缩进和空行。"
+            "每行一个 <p style=\"margin:0\"> + 缩进写 &nbsp;")
+    if no_nowrap:
+        warnings.append(
+            f"{no_nowrap} 行较长代码没内联 white-space:nowrap —— 微信会注入 white-space:normal "
+            "把横滑改回折行，列对齐全乱。用 highlight_code.py 生成代码块")
+    if has_mono and not OVERFLOW_X_RE.search(html):
+        warnings.append(
+            "全文有代码块但没有 overflow-x:auto —— 超宽代码行在手机上只能折行。"
+            "外层 section 加 overflow-x:auto;-webkit-overflow-scrolling:touch;white-space:nowrap;")
 
 
 class LeafChecker(HTMLParser):
@@ -144,6 +225,7 @@ def validate(html, name="<input>"):
                 f"{msg}（命中 {hits} 处）")
 
     check_code_fidelity(html, warnings)
+    check_narrow_screen(html, warnings)
 
     checker = LeafChecker()
     try:

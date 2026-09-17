@@ -72,9 +72,13 @@
 
 ```html
 <section style="background:#fffef8;border:2px solid #1a1a1a;box-shadow:4px 4px 0 #1a1a1a;margin-bottom:32px;">
+  <!-- 窄屏适配：本行最窄要扛 288px（320dp 手机，扣掉左右 padding 后内宽约 248px）。
+       标签字距已从 4px 收到 2px 并加 nowrap；{{头部标签}} 必须 ≤8 字符
+       （8 字符 ≈105px + 星级 ≈55px + 边距 ≈40px 才放得下），超了就删字——
+       别指望 flex-wrap"能挤就挤"，X5 内核会把星级整个挤出边界（摸鱼绿实测同类问题）。 -->
   <section style="background:#059669;padding:12px 20px;display:flex;justify-content:space-between;align-items:center;">
-    <section style="color:#fffef8;font-size:11px;letter-spacing:4px;font-weight:600;"><span leaf="">{{头部标签}}</span></section>
-    <section style="color:#fffef8;font-size:11px;letter-spacing:2px;"><span leaf="">★★★★★</span></section>
+    <section style="color:#fffef8;font-size:11px;letter-spacing:2px;font-weight:600;white-space:nowrap;"><span leaf="">{{头部标签}}</span></section>
+    <section style="color:#fffef8;font-size:11px;letter-spacing:2px;white-space:nowrap;"><span leaf="">★★★★★</span></section>
   </section>
   <section style="display:flex;">
     <section style="flex:1;padding:24px 20px;border-right:2px dashed #A7F3D0;">
@@ -115,9 +119,11 @@
     <section style="padding:0 8px;font-size:10px;color:#A7F3D0;"><span leaf="">✂</span></section>
     <section style="flex:1;border-top:2px dashed #A7F3D0;"><span leaf=""><br></span></section>
   </section>
-  <section style="padding:10px 20px;display:flex;justify-content:space-between;align-items:center;">
-    <section style="font-size:10px;color:#999;letter-spacing:1px;"><span leaf="">VALID FOR ONE READ</span></section>
-    <section style="font-size:10px;color:#999;letter-spacing:1px;"><span leaf="">ADMIT ONE 🎫</span></section>
+  <!-- 窄屏适配：两条英文合计约 330px，在 288px 手机上（内宽约 248px）单行 justify-between
+       必然把右侧挤出边界。改成确定性两行：上行左对齐、下行右对齐，任何宽度都不溢出。 -->
+  <section style="padding:10px 20px;">
+    <p style="margin:0;font-size:10px;color:#999;letter-spacing:1px;white-space:nowrap;"><span leaf="">VALID FOR ONE READ</span></p>
+    <p style="margin:4px 0 0;font-size:10px;color:#999;letter-spacing:1px;text-align:right;white-space:nowrap;"><span leaf="">ADMIT ONE 🎫</span></p>
   </section>
 </section>
 ```
@@ -133,7 +139,7 @@
 ```html
 <section style="margin-bottom:32px;padding:0 20px;">
   <section style="display:flex;align-items:center;gap:12px;margin-bottom:24px;padding-bottom:12px;border-bottom:2px solid #1a1a1a;">
-    <section style="background:#059669;color:#fff;font-size:12px;font-weight:800;padding:6px 12px;letter-spacing:2px;"><span leaf="">{{编号}}</span></section>
+    <section style="background:#059669;color:#fff;font-size:12px;font-weight:800;padding:6px 12px;letter-spacing:2px;white-space:nowrap;"><span leaf="">{{编号}}</span></section>
     <section style="font-size:18px;font-weight:800;color:#1a1a1a;letter-spacing:1px;"><span leaf="">{{标题}}</span></section>
     <section style="font-size:12px;color:#888;"><span leaf="">/ {{副标题}}</span></section>
   </section>
@@ -369,7 +375,7 @@
       </section>
     </section>
     <section style="border-top:1px dashed #ccc;padding-top:12px;">
-      <p style="font-size:10px;color:#999;letter-spacing:2px;margin:0;">
+      <p style="font-size:10px;color:#999;letter-spacing:2px;white-space:nowrap;margin:0;">
         <span leaf="">THANKS FOR READING ✂</span>
       </p>
     </section>
@@ -406,6 +412,23 @@
 ## 多行代码块 → 用通用增量库
 
 本主题不设专属多行代码块组件；Markdown 的三反引号围栏代码块直接用 `common-components.md` 的 1a 深色代码块（默认）或 1b 浅色代码块，左竖条/强调色换成本主题主色 `#059669`；行内代码用本主题组件 6d。
+
+---
+
+## 窄屏适配硬规矩（全主题通用，本主题尤其注意）
+
+> 依据：手机正文最窄按 **288px** 算（320dp 机型），360dp 是 328px。桌面 677px 是网页 max-width，
+> **永远不要拿它判断"放不放得下"**。以下规矩在摸鱼绿上实测踩过坑，本主题组件已按此写好，改动时必须遵守：
+
+1. **眉题/标签行**：`font-size ≤12px` 且 `letter-spacing ≥2px` 的文字**必须加 `white-space:nowrap`**，
+   且按"288px − 容器留白"核算同行所有元素总宽；放不下就改两行结构或删字。
+2. **禁止 flex-wrap 兜底**：靠 `flex-wrap:wrap` 让"能挤就挤"在 X5 内核上会把一侧整个挤出边界（实测），
+   该两行的组件（票脚、品牌条）一律写成**确定性两行**。
+3. **代码块横滑**：多行代码用通用库 1a/1b——外层 `overflow-x:auto` + 每行 `<p>` 内联 `white-space:nowrap`
+   （微信会注入 `white-space:normal`，只有内联压得住）；禁止 `white-space:pre`。
+4. **固定宽度**：任何元素的固定 `width:xxx px` 不得超过 288px（`max-width:677px` 容器除外）。
+5. **交付前自查**：按 288px 视口宽度截图/量一遍——无横向溢出、无断词、等高卡片不参差；
+   并跑 `scripts/validate_gzh_html.py`，窄屏类 warning 清零。
 
 ---
 

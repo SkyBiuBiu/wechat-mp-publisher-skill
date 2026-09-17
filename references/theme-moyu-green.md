@@ -183,10 +183,10 @@
 ```html
 <section style="margin:0 20px 32px;">
   <section style="display:flex;align-items:center;justify-content:space-between;margin-bottom:10px;">
-    <p style="font-size:10px;color:#9CA3AF;margin:0;text-transform:uppercase;letter-spacing:2px;font-weight:600;">
+    <p style="font-size:10px;color:#9CA3AF;margin:0;text-transform:uppercase;letter-spacing:2px;font-weight:600;white-space:nowrap;">
       <span leaf="">📦 {{N}} Parts + Conclusion</span>
     </p>
-    <p style="font-size:10px;color:#9CA3AF;margin:0;">
+    <p style="font-size:10px;color:#9CA3AF;margin:0;white-space:nowrap;">
       <span leaf="">👉 滑动</span>
     </p>
   </section>
@@ -255,7 +255,7 @@
       <p style="margin:0;font-size:28px;font-weight:900;color:#059669;line-height:1;letter-spacing:-2px;">
         <span leaf="">{{01}}</span>
       </p>
-      <p style="margin:0;font-size:8px;font-weight:700;color:#D1D5DB;letter-spacing:2px;">
+      <p style="margin:0;font-size:8px;font-weight:700;color:#D1D5DB;letter-spacing:2px;white-space:nowrap;">
         <span leaf="">PART</span>
       </p>
     </section>

@@ -51,9 +51,10 @@
    - 文章类型 → 组件组合配方表
    - Markdown → 组件映射规则表
 3. **平台红线复查**：剔除任何 `class`/`id` 依赖（预览 HTML 里的 `id="block-*"` 仅用于预览定位，进主题库的组件 HTML 一律去掉 id）、禁用标签、`>24px` 字号；`table` 只保留真实表格语义的。
-4. **登记 theme-index.md**：主题名 / 主色（THEME-COLOR）/ 适用场景（THEME-SCENE-TAGS）/ 组件库文件 / 正文下划线 CSS（从强调色或装饰色推导一条 `border-bottom` 样式）。
-5. **跑检查**：`python3 scripts/component_lint.py .` 须 0 ERROR；有 ERROR 修完再交付。
-6. **交付汇报**：主题名 + ID + 预览文件路径 + 已可在排版流程中选用；提醒用户可随时说「用 XX 主题排版」。
+4. **窄屏复查**（硬性，同下方提示词 7.8 节）：眉题/标签/品牌条按 288px 手机宽度核算；`font-size ≤12px` 且 `letter-spacing ≥2px` 的文字必须 `white-space:nowrap` 并限字数；"标签+日期/星级"同行放不下就改确定性两行，**禁止靠 flex-wrap 挤压**（X5 内核会把一侧挤出边界，摸鱼绿/摸鱼票据实测）；固定 `width` 不得超过 288px；多行代码块一律引用通用库 1a/1b 横滑结构。改完按 288px 视口自查一遍，并跑 `scripts/validate_gzh_html.py` 清零窄屏类 warning。
+5. **登记 theme-index.md**：主题名 / 主色（THEME-COLOR）/ 适用场景（THEME-SCENE-TAGS）/ 组件库文件 / 正文下划线 CSS（从强调色或装饰色推导一条 `border-bottom` 样式）。
+6. **跑检查**：`python3 scripts/component_lint.py .` 须 0 ERROR；有 ERROR 修完再交付。
+7. **交付汇报**：主题名 + ID + 预览文件路径 + 已可在排版流程中选用；提醒用户可随时说「用 XX 主题排版」。
 
 ## 维护
 
@@ -302,6 +303,22 @@
 - 没有使用被明确禁止的标签或交互能力
 - 没有依赖复杂现代 CSS 才能成立的核心布局
 - 即使部分样式轻微退化，内容结构、阅读顺序、视觉重点依然完整
+
+7.8 窄屏适配铁律（必须遵守，违反即返工）：
+公众号文章的真实阅读宽度是手机屏：最窄按 288px 算（320dp 机型），主流 360dp 是 328px；
+桌面 677px 只是网页 max-width，禁止拿它判断任何元素"放不放得下"。具体规矩：
+- 眉题/标签/品牌条：`font-size ≤ 12px` 且 `letter-spacing ≥ 2px` 的文字必须加
+  `white-space:nowrap`，并按"288px − 容器留白"核算同行所有元素总宽后限制字数
+  （字距 2px 时约 ≤12 字符，字距 4px 时约 ≤8 字符）。
+- 「标签 + 日期/星级/说明」同一 flex 行的组件，总宽放不下时必须改成**确定性两行**
+  （上行标签、下行日期，各带 nowrap）；**禁止依赖 flex-wrap / auto-margin 挤压**——
+  老旧 X5 内核会把一侧整个挤出边界（内置主题实测踩坑）。
+- 多行代码块必须按通用增量库 1a/1b 的横滑结构：外层 `overflow-x:auto;-webkit-overflow-scrolling:touch;`
+  + 每行 `<p>` 内联 `white-space:nowrap`；**禁止 `white-space:pre`**；缩进与对齐用 `&nbsp;`。
+- 三列/多列等宽卡片区：按 288px 核算单卡内宽（通常仅 60~85px），占位文案限 6 字以内，
+  并在主题库文档里写明字数上限。
+- 禁止任何固定 `width: xxx px` 超过 288px 的元素（外层 `max-width:677px` 容器除外）。
+- 生成后必须按 288px 视口宽度自查一遍：无横向溢出、无断词、等高卡片不参差。
 
 8. 输出必须是纯 HTML 内容，不要解释，不要加 Markdown 代码围栏，不要加"下面是生成结果"等说明。
 

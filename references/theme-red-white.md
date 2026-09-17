@@ -83,6 +83,8 @@
 ## 组件 3 前言导读区域（本文看点，三列目录卡片）
 
 > 3 个及以上章节时生成。红底白字编号 + 深色标题；展示**精选 3 个核心看点**，不是全量章节列表。
+>
+> **窄屏硬规矩**：288px 手机上每张卡内宽只有约 **60px**（13px 字号一行只放 4~5 个字）。{{看点}} 必须 **≤6 字**（最多两行、三卡等高）；超过 6 字就删字，别指望折行——折成三行整排就参差。把握不准时改用上下堆叠的单列清单（每行 `01 {{看点}}`）替代三列。
 
 ```html
 <section style="padding:0 10px 32px;">
@@ -130,7 +132,7 @@
     <section style="display:flex;align-items:center;">
       <span style="display:inline-block;background:#DC2626;color:#FFFFFF;font-size:18px;font-weight:900;padding:4px 14px;border-radius:6px;margin-right:14px;line-height:1.3;"><span leaf="">01</span></span>
       <section>
-        <p style="font-size:10px;color:#DC2626;font-weight:700;letter-spacing:3px;margin:0 0 2px;text-transform:uppercase;">
+        <p style="font-size:10px;color:#DC2626;font-weight:700;letter-spacing:3px;white-space:nowrap;margin:0 0 2px;text-transform:uppercase;">
           <span leaf="">{{ENGLISH TAG}}</span>
         </p>
         <h3 style="font-size:18px;font-weight:800;color:#1C1917;margin:0;letter-spacing:0.5px;">
@@ -505,7 +507,7 @@
   <section style="text-align:center;margin:0 0 32px;">
     <section style="display:flex;align-items:center;justify-content:center;">
       <span style="height:2px;width:60px;background:linear-gradient(to right,transparent,#DC2626);margin-right:12px;"><span leaf=""><br></span></span>
-      <span style="font-size:11px;color:#DC2626;letter-spacing:3px;font-weight:700;"><span leaf="">END</span></span>
+      <span style="font-size:11px;color:#DC2626;letter-spacing:3px;white-space:nowrap;font-weight:700;"><span leaf="">END</span></span>
       <span style="height:2px;width:60px;background:linear-gradient(to left,transparent,#DC2626);margin-left:12px;"><span leaf=""><br></span></span>
     </section>
   </section>

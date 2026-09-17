@@ -15,6 +15,8 @@
 | 摸鱼票据风 | `#059669` emerald | 测评、工具对比、创意评测（票据/门票视觉隐喻，星级评分+编号+硬阴影卡片） | `references/theme-moyu-ticket.md` | `border-bottom:2px solid #A7F3D0;font-weight:600;` |
 | 橄榄手记 | `#1e1f23` 墨黑（配橙 `#ed7b2f`） | 内刊手记、深度评测、案例复盘、系统性说明文档（编辑部内刊质感，分节形式多样，信息密度偏高） | `references/theme-olive-journal.md` | `border-bottom:2px solid #ed7b2f;font-weight:600;` |
 
+> **全主题共享的窄屏铁律**（每套主题组件库内各有落地细则）：手机正文最窄 288px、主流 328px，桌面 677px 只是网页 max-width。眉题/标签文字 `font-size ≤12px` 且 `letter-spacing ≥2px` 必须 `white-space:nowrap` 并限字数；"标签+日期"同行放不下改确定性两行、禁止 flex-wrap 挤压；多行代码块一律通用库 1a/1b 横滑（外层 `overflow-x:auto` + 每行内联 `white-space:nowrap`，禁 `white-space:pre`）；固定 `width` 不得超 288px。排版完必须按 288px 视口自查 + 跑 `validate_gzh_html.py` 清零窄屏 warning。
+
 ## 选择建议
 
 - **用户选择制**：用户没指定主题时，把本表全部主题列给用户选（中文名 + 适用场景），不替用户定；最贴合题材的主题可标"（推荐）"放第一位。

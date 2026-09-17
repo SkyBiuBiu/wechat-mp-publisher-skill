@@ -384,6 +384,8 @@ python <skill>/scripts/publish.py draft -c wechat-publish/config.json
 > **判长度别用 `wc -c`**：它数的是 UTF-8 字节，中文按 3 字节计，会把 1.6 万字的文章显示成 2.1 万。以 `preflight.py` 的 Python `len(html)` 输出为准。
 >
 > **微信兼容铁律**（主题库已按此写好）：装饰性空元素内部要放 `<span leaf=""><br></span>` 占位；不要把 `font-size`/`border-bottom` 打在 `<strong>` 上；同一个 `<p>` 里不混多个字号；不用 `position:absolute` 做划线；无内容的结构化区域整块删掉。
+>
+> **窄屏适配铁律**（全主题通用，覆盖 PC / 平板 / 各档手机）：手机正文最窄按 **288px** 算（320dp 机型），主流 360dp 是 328px，平板与 PC 只会更宽——**所有排版判断以 288px 为下限**。眉题/标签文字 `font-size ≤12px` 且 `letter-spacing ≥2px` 必须加 `white-space:nowrap` 并限字数（字距 2px ≤12 字符、4px ≤8 字符）；"标签+日期/星级"同行放不下就写成**确定性两行**，禁止靠 flex-wrap 挤压（X5 内核会把一侧挤出边界，实测）；多行代码块一律用通用库 1a/1b 横滑结构（外层 `overflow-x:auto` + 每行内联 `white-space:nowrap`，禁 `white-space:pre`，缩进用 `&nbsp;`）；固定 `width` 不得超 288px。交付前按 288px 视口自查一遍，并跑 `validate_gzh_html.py` 让窄屏类 warning 清零——该脚本会自动拦截这几类坏法。
 
 ---
 
