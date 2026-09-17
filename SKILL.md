@@ -223,9 +223,20 @@ cp <skill>/assets/templates/config.example.json wechat-publish/config.json
 python <skill>/scripts/make_assets.py -c wechat-publish/config.json -o wechat-publish/assets \
     --title "文章标题" --subtitle "副标题" --date "2026.09"
 ```
-需 `pillow`。出两张：`cover.png`（900×383，微信推荐比例）和 `diagram.png`（正文插图占位，用不上就删）。
+需 `pillow`。默认出两张：`cover.png`（900×383，微信推荐比例）和 `diagram.png`（正文插图占位）。
 **配色从主题库 `references/theme-<id>.md` 的「设计变量速查表」解析**（主色调/标题色/正文色/辅助文字/极浅底），
-封面与正文成套。`--theme <id>` 手动指定，`--dark` 回到旧的深色橙调版式。
+封面与正文成套。`--theme <id>` 手动指定，`--dark` 回到旧的深色橙调版式。`--only cover` 只要封面。
+
+封面右侧那块极淡主色默认空着。讲**循环 / 流程 / 分步**的文章用 `--motif ring` 在那里点一个环形意象
+（N 个节点 + 顺时针箭头 + 圆心文字），`--motif-nodes` 填文章里的环节数：
+
+```bash
+python <skill>/scripts/make_assets.py -c wechat-publish/config.json -o wechat-publish/assets \
+    --title "Agent Loop 运行原理" --subtitle "一次循环的七个环节" --date "2026.09" \
+    --motif ring --motif-nodes 7 --motif-caption "7 STEPS" --only cover
+```
+
+圆心文字分主副两行（`--motif-label` 默认 `LOOP`、`--motif-caption` 默认空）。不想要意象就不加 `--motif`。
 
 ### Step 4：发布前体检
 

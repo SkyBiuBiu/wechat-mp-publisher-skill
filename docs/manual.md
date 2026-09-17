@@ -251,10 +251,19 @@ python scripts/make_assets.py -c work/config.json -o work/assets \
     --title "标题" --subtitle "副标题" --date "2026.09"
 ```
 
-需 `pillow`：`pip install pillow`。输出 900×383 封面（2.35:1）与一张正文插图占位（不用就删）。
+需 `pillow`：`pip install pillow`。输出 900×383 封面（2.35:1）与一张正文插图占位（`--only cover` 可只出封面）。
 **配色会自动跟着 `config.json` 的 `theme` 走**——从主题库的「设计变量速查表」里解析主色调、标题色、
 正文色、辅助文字色、极浅底色，所以封面和正文天然成套。想手动指定用 `--theme moyu-green`，
 想让封面回到内置的深色橙调版式用 `--dark`。
+
+封面右侧那块极淡主色默认是空的。讲循环、流程、分步的文章可以让它点一个环形意象——
+环上 N 个节点、顺时针箭头、圆心两行文字，节点数按文章里的环节数填：
+
+```bash
+python scripts/make_assets.py -c work/config.json -o work/assets \
+    --title "一次循环的七个环节" --subtitle "Agent Loop 拆帧" --date "2026.09" \
+    --motif ring --motif-nodes 7 --motif-caption "7 STEPS" --only cover
+```
 
 ---
 

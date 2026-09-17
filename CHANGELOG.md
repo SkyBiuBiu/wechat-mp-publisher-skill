@@ -16,6 +16,19 @@
 - 封面裁剪比例 `cover_info.crop_percent_list` 支持（`2.35_1` / `1_1`）
 - 图片消息（`article_type=newspic`）支持
 
+## [0.5.1] - 2026-09-17
+
+### Added
+
+- `make_assets.py` 封面新增意象 `--motif ring`：在封面右侧那块极淡主色里点一个
+  「环形节点 + 顺时针箭头 + 圆心文字」的循环意象，节点数用 `--motif-nodes` 对齐
+  文章里的环节数（讲循环 / 流程 / 分步的文章直接可用），圆心文字分主副两行
+  （`--motif-label` / `--motif-caption`）。
+  实现上单独开一层 RGBA 再 `alpha_composite` —— PIL 的 `ImageDraw` 画在 RGBA
+  画布上是**直接写像素、不做混色**，低透明度图形必须走图层合成（同 `_wash` 的理由）
+- `make_assets.py` 新增 `--only {all,cover,diagram}`。此前只想更新封面也会连带
+  生成 `diagram.png`，工作目录里总留一份用不上的插图，还得手工删
+
 ## [0.5.0] - 2026-09-17
 
 ### Changed

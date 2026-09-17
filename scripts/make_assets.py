@@ -9,6 +9,8 @@
     python make_assets.py --theme moyu-green -o assets      # 指定主题
     python make_assets.py --title "标题" --subtitle "副标题" --brand "署名"
     python make_assets.py --dark                            # 忽略主题，用内置深色版式
+    python make_assets.py --motif ring --motif-caption "7 STEPS"   # 封面右侧画「循环」意象
+    python make_assets.py --only cover                      # 只要封面，别生成插图
 产出：
     cover.png        1800x766（公众号封面 2.35:1，2x 高清）
     diagram.png      1800x840（正文插图，链路示意，2x 高清）
@@ -23,6 +25,7 @@
 import argparse
 import io
 import json
+import math
 import os
 import re
 import sys
@@ -177,7 +180,64 @@ def _wash(img, box, color, alpha, radius):
     img.alpha_composite(layer)
 
 
-def make_cover(out_dir, brand, title, subtitle, date_str, theme=None):
+def _ring_motif(img, cx, cy, radius, accent, nodes=7, label="LOOP", caption=""):
+    """封面右下角画一个「循环」意象：环形导轨 + N 个节点 + 顺时针箭头 + 圆心文字。
+
+    单独开一层 RGBA 再 alpha_composite —— PIL 的 ImageDraw 画在 RGBA 画布上是
+    直接写像素、不做混色，低透明度图形必须走图层合成（同 _wash 的理由）。
+
+    版式上这块落在封面右侧的极淡主色块里（x > 600），与左侧标题/副标题不重叠；
+    节点数与箭头方向按「一圈走 N 步、顺时针推进」表达循环。
+    """
+    layer = Image.new("RGBA", img.size, (0, 0, 0, 0))
+    d = ImageDraw.Draw(layer)
+
+    cx, cy, R = cx * S, cy * S, radius * S
+    step = 360.0 / max(1, nodes)
+
+    def pt(deg):
+        a = math.radians(deg)
+        return cx + R * math.cos(a), cy + R * math.sin(a)
+
+    # 导轨圆（很淡，只是把节点串成环）
+    d.ellipse([cx - R, cy - R, cx + R, cy + R],
+              outline=accent + (60,), width=2 * S)
+
+    # 相邻节点之间的中点上放箭头，方向 = 顺时针切向（角度增大即屏幕上顺时针）
+    for i in range(nodes):
+        deg = -90 + (i + 0.5) * step
+        px, py = pt(deg)
+        a = math.radians(deg)
+        tx, ty = -math.sin(a), math.cos(a)   # 切向 = 前进方向
+        nx, ny = math.cos(a), math.sin(a)    # 法向 = 用于撑开箭头底边
+        tip = (px + tx * 5 * S, py + ty * 5 * S)
+        b1 = (px - tx * 3.5 * S + nx * 4 * S, py - ty * 3.5 * S + ny * 4 * S)
+        b2 = (px - tx * 3.5 * S - nx * 4 * S, py - ty * 3.5 * S - ny * 4 * S)
+        d.polygon([tip, b1, b2], fill=accent + (135,))
+
+    # 节点：起始节点实心加大（当前这一轮的入口），其余半透明
+    for i in range(nodes):
+        x, y = pt(-90 + i * step)
+        r = (7 if i == 0 else 5.5) * S
+        alpha = 255 if i == 0 else 96
+        d.ellipse([x - r, y - r, x + r, y + r], fill=accent + (alpha,))
+    x, y = pt(-90)
+    d.ellipse([x - 13 * S, y - 13 * S, x + 13 * S, y + 13 * S],
+              outline=accent + (110,), width=2 * S)
+
+    # 圆心文字（anchor="mm" 让文字正中对齐到圆心，省得自己量基线偏移）
+    if label:
+        d.text((cx, cy - 9 * S), label, font=font(19, True),
+               fill=accent + (235,), anchor="mm")
+    if caption:
+        d.text((cx, cy + 14 * S), caption, font=font(12),
+               fill=accent + (150,), anchor="mm")
+
+    img.alpha_composite(layer)
+
+
+def make_cover(out_dir, brand, title, subtitle, date_str, theme=None,
+               motif=None, motif_nodes=7, motif_label="LOOP", motif_caption=""):
     W, H = 900 * S, 383 * S
     if theme:
         img = Image.new("RGBA", (W, H), theme["light"] + (255,))
@@ -213,10 +273,17 @@ def make_cover(out_dir, brand, title, subtitle, date_str, theme=None):
     d.text((56 * S, 256 * S), subtitle, font=font(21), fill=muted)
     d.text((56 * S, 306 * S), date_str, font=font(17), fill=dim)
 
+    # 右侧空白处点一个意象。圆心取极淡色块的可视中心（色块右边被画布裁掉，
+    # 可视区是 x∈[600,900]，中心 750），半径让最右节点离画布边留 ~35px
+    if motif == "ring":
+        _ring_motif(img, 762, 197, 90, accent,
+                    nodes=motif_nodes, label=motif_label, caption=motif_caption)
+
     img = img.convert("RGB")
     path = os.path.join(out_dir, "cover.png")
     img.save(path)
     print("封面已生成: {}  ({}x{})".format(path, W, H))
+
 
 
 def make_flow(out_dir, theme=None):
@@ -293,6 +360,15 @@ def main():
                         "想自己控制换行就在参数里写 \\n")
     p.add_argument("--subtitle", default="副标题 / 一句话摘要", help="封面副标题")
     p.add_argument("--date", default="", help="封面日期，留空不显示")
+    p.add_argument("--motif", choices=["none", "ring"], default="none",
+                   help="封面右侧的意象图：ring=环形节点+顺时针箭头（讲循环/流程的文章用）")
+    p.add_argument("--motif-nodes", type=int, default=7,
+                   help="ring 意象的节点数，默认 7（对应「几个环节」就填几）")
+    p.add_argument("--motif-label", default="LOOP", help="ring 圆心主文字，默认 LOOP")
+    p.add_argument("--motif-caption", default="",
+                   help="ring 圆心副文字（小字），如 \"7 STEPS\"，留空不画")
+    p.add_argument("--only", choices=["all", "cover", "diagram"], default="all",
+                   help="只生成其中一张；默认 all（两张都出）")
     args = p.parse_args()
 
     try:
@@ -317,8 +393,12 @@ def main():
                 theme["id"], "#%02X%02X%02X" % theme["primary"]))
 
     os.makedirs(args.out, exist_ok=True)
-    make_cover(args.out, args.brand, args.title, args.subtitle, args.date, theme)
-    make_flow(args.out, theme)
+    if args.only in ("all", "cover"):
+        make_cover(args.out, args.brand, args.title, args.subtitle, args.date, theme,
+                   motif=args.motif, motif_nodes=args.motif_nodes,
+                   motif_label=args.motif_label, motif_caption=args.motif_caption)
+    if args.only in ("all", "diagram"):
+        make_flow(args.out, theme)
 
 
 if __name__ == "__main__":

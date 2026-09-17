@@ -304,7 +304,7 @@ python scripts/publish.py <子命令> [参数]
 | `scripts/extract_docx.py` | Word(.docx) → Markdown |
 | `scripts/preflight.py` | 发布前体检：P0/P1/P2 三级清单，`--json` / `--warn-only` / `--quiet` |
 | `scripts/watch_ip.py` | 轮询等白名单生效，通了自动建草稿。`-i 秒` 调间隔，`-m 次数` 限次，`--no-preflight` 透传 |
-| `scripts/make_assets.py` | 生成封面（900×383），需 `pillow`；配色跟 `config.json` 的 `theme` 走，`--theme` / `--dark` 可覆盖，`--title/--subtitle/--date` 可配 |
+| `scripts/make_assets.py` | 生成封面（900×383），需 `pillow`；配色跟 `config.json` 的 `theme` 走，`--theme` / `--dark` 可覆盖，`--title/--subtitle/--date` 可配；`--motif ring` 在右侧空处点一个环形循环意象（`--motif-nodes` 定节点数），`--only cover` 只出封面 |
 | `scripts/validate_skill.py` | 仓库自检：结构 / frontmatter / 版本 / 语法 / 密钥 / 引用 / 主题注册表 / 组件库源头关 |
 | `scripts/build_zip.py` | 打分发 zip 到 `dist/`，自动排除密钥与本机状态 |
 
