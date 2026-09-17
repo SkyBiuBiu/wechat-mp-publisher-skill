@@ -7,12 +7,29 @@
 6 套精选主题组件库把 Markdown 排成可直接粘贴进公众号编辑器的 HTML，再用微信官方 API 把图文推进草稿箱。排版、校验、配图、上传、成稿一条龙，剩下最后点一下「发表」的功夫给你。
 
 [![CI](https://github.com/SkyBiuBiu/wechat-mp-publisher-skill/actions/workflows/ci.yml/badge.svg)](https://github.com/SkyBiuBiu/wechat-mp-publisher-skill/actions/workflows/ci.yml)
-[![License: MIT](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
+[![License: MIT + AGPL-3.0](https://img.shields.io/badge/license-MIT%20%2B%20AGPL--3.0-blue.svg)](#license)
 [![Version](https://img.shields.io/github/v/tag/SkyBiuBiu/wechat-mp-publisher-skill)](CHANGELOG.md)
 
 </div>
 
 ---
+
+## 这个仓库是什么
+
+两件事拼起来的：
+
+| | 排版链路 | 发布链路 |
+|---|---|---|
+| **干什么** | 把内容排成公众号能吃的内联样式 HTML | 把排好的 HTML 连同图片、封面推进草稿箱 |
+| **谁写的** | [isjiamu/gzh-design-skill](https://github.com/isjiamu/gzh-design-skill)（原创 **甲木 × 摸鱼小李**） | 本仓库 |
+| **授权** | **AGPL-3.0**（原文见 [`LICENSE-gzh-design`](LICENSE-gzh-design)） | MIT（见 [`LICENSE`](LICENSE)） |
+
+排版那一半是**原样搬过来的**——6 套主题组件库、通用组件库、主题生成器、归一化规则、
+双关卡校验脚本、预览页，全部与上游逐字节一致，不改一行，方便日后跟着上游 re-sync。
+要改组件，改上游；本仓库只在发布侧加东西。
+
+> 上游是 AGPL-3.0：**署名与授权声明不得删除**，这部分内容的修改版、Fork、二次分发
+> 须以 AGPL-3.0（或兼容协议）公开发布。详见 [License](#license)。
 
 ## 能做什么、不能做什么
 
@@ -39,7 +56,7 @@
 - **样式粘贴不掉**：所有样式内联、每个文字节点 `<span leaf="">` 包裹，规避 `<style>`/`<div>`/`class`/`grid`/`position` 等公众号会过滤的写法。
 - **双关卡质量校验**：`component_lint.py`（组件库源头）+ `validate_gzh_html.py`（最终产物），构成可复现的「改→验→修」闭环。
 - **一键复制预览页**：生成带「复制到公众号」按钮的预览页，点一下把渲染后的富文本复制到剪贴板，免手动全选。
-- **内容全兼容**：Markdown / Word(.docx) / PDF / 纯文本输入（非 Markdown 先自动归一化）。
+- **内容输入**：Markdown 为主。Word(.docx) 用 `scripts/extract_docx.py` 转成 Markdown；PDF 与纯文本按 [`references/format-normalize.md`](references/format-normalize.md) 的规则先归一化再排版。
 - **主题生成器**：不满足现成主题？用一句话描述或一张参考图，生成一套全新组件库并保存本地复用。
 
 ### 发布侧
@@ -52,6 +69,60 @@
 - **错误码翻成人话**：微信的 `errcode` 直接翻译成处置建议，`40164` 还会自动从报错里抠出被拒的 IP。
 - **白名单等待器**：`watch_ip.py` 挂着轮询，白名单一生效自动接着建草稿，不用反复手点。
 - **默认只建草稿**：正式发布需要显式确认；删除草稿必须给 `media_id`，防手滑。
+
+## 六套主题
+
+同一段内容，六套主题各排一遍。**下面每张图都是用该主题组件库里的真实组件渲染出来的**，
+不是示意图——改一句文案、少一个组件，截图就会跟着变。
+
+### 摸鱼绿 · `moyu-green`（默认）
+
+绿色杂志风，卡片丰富、信息密度高。适合教程、测评、清单、工具盘点。
+
+![摸鱼绿主题样例](docs/images/theme-moyu-green.png)
+
+### 红白色系 · `red-white`
+
+红底编号标签 + 红色实线，经典的编辑风力量感。适合深度分析、观点输出、争议话题。
+
+![红白色系主题样例](docs/images/theme-red-white.png)
+
+### 石墨极简风 · `graphite-minimal`
+
+超大水印编号压底、几乎全灰阶、橙色只在 ≤3 处锚点出现。适合设计、科技评论、专业观点。
+
+![石墨极简主题样例](docs/images/theme-graphite-minimal.png)
+
+### 留白禅意风 · `zen-whitespace`
+
+衬线大字标题、上下细线框定的居中金句、大留白。适合禅意随笔、深度长文。
+
+![留白禅意主题样例](docs/images/theme-zen-whitespace.png)
+
+### 摸鱼票据风 · `moyu-ticket`
+
+2px 黑描边 + 3px 硬阴影的票据隐喻，绿色只做点缀。适合工具对比、创意评测。
+
+![摸鱼票据主题样例](docs/images/theme-moyu-ticket.png)
+
+### 橄榄手记 · `olive-journal`
+
+米白纸感 + 橄榄灰 + 橙色下划线，内刊手记的气质。适合案例复盘、深度评测。
+
+![橄榄手记主题样例](docs/images/theme-olive-journal.png)
+
+---
+
+全套主题的取舍（主色、字号、组件清单、适用场景）见 [`references/theme-index.md`](references/theme-index.md)；
+每套组件库的完整组件与用法在 `references/theme-<标识>.md`。
+
+**同一篇只用一套主题，不跨主题混用组件。**
+
+**想要内置 6 套之外的风格**：走 [`references/theme-generator.md`](references/theme-generator.md) 的主题生成器——
+按一句话描述或一张参考图生成 45~75 个区块的完整组件库，整页确认后转成标准主题库并登记，之后与内置主题完全同权。
+
+> 配图怎么来的：`python tools/make_theme_previews.py`（同一段内容 × 六套主题，
+> 用真实组件装配后拿本机 Chrome 无头截图）。改了组件库就该重跑，否则图会跟实现对不上。
 
 ## 安装
 
@@ -127,24 +198,9 @@ python scripts/publish.py draft -c work/config.json
 ```
 
 凭证和 IP 白名单怎么弄（最容易卡的一步）→ [`docs/manual.md`](docs/manual.md)
-主题怎么选、组件怎么用 → [`references/theme-index.md`](references/theme-index.md)
+主题长什么样、怎么选 → [六套主题](#六套主题)
 
-### 6 套主题
-
-| 主题 | 主色 | 适合 |
-|---|---|---|
-| **摸鱼绿**（默认） | `#059669` | 教程、测评、清单、工具盘点（卡片丰富、信息密度高） |
-| **红白色系** | `#DC2626` | 深度分析、观点、力量感话题（经典编辑风） |
-| **石墨极简风** | `#52525B` | 设计、科技评论、专业观点、高端品牌 |
-| **留白禅意风** | `#4A5D52` | 禅意、极简生活、深度随笔（呼吸感最强） |
-| **摸鱼票据风** | `#059669` | 工具对比、创意评测（票据视觉隐喻） |
-| **橄榄手记** | `#1e1f23` | 内刊手记、深度评测、案例复盘（信息密度偏高） |
-
-同一篇只用一套主题，不跨主题混用组件。
-
-**想要内置 6 套之外的风格**：让 AI 走 [`references/theme-generator.md`](references/theme-generator.md) 的主题生成器——按一句话描述或一张参考图生成 45~75 个区块的完整组件库，整页确认后转成标准主题库并登记，之后与内置主题完全同权。
-
-### 双关卡校验长什么样
+## 双关卡校验
 
 ```bash
 python scripts/validate_gzh_html.py work/article.html
@@ -166,31 +222,48 @@ ERROR 清零、半角标点 WARNING 也修到 0 才算完成——半角标点�
 python scripts/component_lint.py .
 ```
 
-### 体检输出长什么样
+## 发布前体检
 
 ```bash
 python scripts/preflight.py -c work/config.json
 ```
 
 ```
-P0 · 阻断 · 1 项        ← 微信一定会报错或内容一定会坏，必须改
-  [WX028] 正文含外链图（非 mmbiz 域名）
-    现象：第 2 张图 https://example.com/a.png
-    处理：改成本地相对路径，脚本会先上传到微信图床再换 src
+== 发布前体检（接口侧硬约束）==
 
-P1 · 警告 · 1 项        ← 发得出去，但图片会丢失 / 版式会塌
+P0 · 阻断 · 1 项
+------------------------------------------------------------------
+  [WX028] 第 2 张图是外链图，会被静默过滤
+        现象：https://example.com/a.png
+        处理：改成本地相对路径，脚本会先上传到微信图床再换 src
+
+P1 · 警告 · 1 项
+------------------------------------------------------------------
   [WX022] 正文超过 2 万字符（文档口径，实测未强制）
-    现象：当前 45259 字符，超出 25259 字
-P2 · 建议 · 2 项        ← 不影响发布，改了更好
+        现象：当前 45259 字符，超出 25259 字
+        处理：接口目前接受且不截断，可直接发；若接口回字数类错误，再按主题库的
+             精简组件重排，或把长代码/长表格转成图片、拆篇
+
+P2 · 建议 · 2 项
+------------------------------------------------------------------
+  [WX202] 未配置原文链接
+        处理：留空则文末不显示「阅读原文」；发布链路跳不通时建议留空
+  [WX203] 评论未开启
+        处理：需要互动时设 need_open_comment=1
 
       正文 45259 字符 [##############] 45259/20000（超出文档口径 25259 字，见 WX022）
       纯文本 4372 字 | 图片 2 张 | 封面 49 KB（1800x766）
+------------------------------------------------------------------
 统计：P0×1  P1×1  P2×2
 结果：不可发布 —— 先修 P0。1 项阻断会让微信直接报错或内容残缺。
       排版类问题不在这里查：跑 scripts/validate_gzh_html.py <正文.html>
 ```
 
 有 P0 时退出码为 1，`draft` 会就地停下（此时还没发任何请求）。`--warn-only` 只报告不拦截，`--json` 给 CI 用。
+
+三级的分工：**P0** 微信一定报错或内容一定坏；**P1** 发得出去但图会丢、版式会塌；
+**P2** 不影响发布。检查项与判定依据（官方硬约束 / 文档口径实测未强制 / 实测行为 / 经验阈值）
+逐条登记在 [`references/wechat-api-reference.md`](references/wechat-api-reference.md) 第六节。
 
 ## 命令参考
 
@@ -265,7 +338,6 @@ python scripts/publish.py <子命令> [参数]
 wechat-mp-publisher-skill/
 ├── SKILL.md                        # 技能入口（排版 + 发布两条链路的工作流）
 ├── README.md                       # 本文件
-├── docs/manual.md                  # 完整操作手册：后台路径、白名单排查、报错表
 ├── CHANGELOG.md                    # 版本变更记录
 ├── CONTRIBUTING.md                 # 开发约定与发版流程
 ├── LICENSE                         # MIT（本仓库自有部分）
@@ -291,6 +363,11 @@ wechat-mp-publisher-skill/
 │   ├── format-normalize.md         # docx/pdf/纯文本 → Markdown
 │   ├── eval-cases.md               # 触发用例与回归核对
 │   └── wechat-api-reference.md     # 接口字段约束、权限矩阵、错误码全表
+├── docs/
+│   ├── manual.md                   # 完整操作手册：后台路径、白名单排查、报错表
+│   └── images/                     # README 的主题样例配图（不进分发包）
+├── tools/
+│   └── make_theme_previews.py      # 生成上面的样例配图（需本机 Chrome，不进分发包）
 ├── assets/
 │   ├── preview-template.html       # 预览页外壳（带复制按钮）
 │   ├── sample-article.md           # 演示输入
@@ -354,7 +431,7 @@ git push origin main --tags
 
 本仓库分两部分：
 
-- **本仓库自有部分**（发布链路：`scripts/publish.py`、`preflight.py`、`render_mermaid.py`、`make_assets.py`、`watch_ip.py`、`validate_skill.py`、`build_zip.py`、`docs/`、`references/wechat-api-reference.md`）—— [MIT](LICENSE) © 2026 Sky (SkyBiuBiu)
+- **本仓库自有部分**（发布链路：`scripts/publish.py`、`preflight.py`、`render_mermaid.py`、`make_assets.py`、`watch_ip.py`、`validate_skill.py`、`build_zip.py`、`tools/`、`docs/`、`references/wechat-api-reference.md`）—— [MIT](LICENSE) © 2026 Sky (SkyBiuBiu)
 - **排版链路**（`references/theme-*.md`、`common-components.md`、`theme-generator.md`、`format-normalize.md`、`eval-cases.md`、`theme-index.md`、`assets/preview-template.html`、`assets/sample-article.md`、`scripts/validate_gzh_html.py`、`component_lint.py`、`wrap_preview.py`、`extract_docx.py`）—— 来自 [**isjiamu/gzh-design-skill**](https://github.com/isjiamu/gzh-design-skill)，原创 **甲木 × 摸鱼小李**，授权 **AGPL-3.0**，原文见 [`LICENSE-gzh-design`](LICENSE-gzh-design)。
 
 > 排版链路的署名与授权声明**不得删除**；这部分内容的修改版、Fork、二次分发须以 AGPL-3.0（或兼容协议）公开发布，即使只作为网络服务提供也要开源。

@@ -59,6 +59,9 @@
    `preflight.py` 里**不要再加排版规则**——那是上一版的设计，改主题时要动两处的教训。
 8. **改主题库必跑源头关**：`python scripts/component_lint.py .`，必须 0 ERROR。
    改产物装配逻辑必跑 `python scripts/validate_gzh_html.py <产物>`，0 ERROR 且半角 WARNING 为 0。
+9. **改主题库还要重生成 README 配图**：`python tools/make_theme_previews.py`。
+   `docs/images/theme-*.png` 是拿各主题的**真实组件**渲染出来的，不是示意图——
+   组件一改图就过期，README 会开始说假话。该脚本需本机 Chrome，与 `docs/images/` 一样不进分发包。
 
 ## 开发流程
 

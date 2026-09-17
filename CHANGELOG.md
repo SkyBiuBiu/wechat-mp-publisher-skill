@@ -54,6 +54,17 @@
   （复用 `component_lint`）」「上游署名与授权文件在位」「旧链路资产已清退」四项守卫
 - `assets/templates/config.example.json` 同步新字段；删除 `article.html` /
   `article.template.html` 两个旧模板
+- `tools/make_theme_previews.py`：README 主题样例配图的生成器。**同一段内容 × 六套主题**，
+  每套都用该主题组件库里的真实组件装配，再用本机 Chrome 无头模式截图、裁掉底部空白。
+  产出 `docs/images/theme-<标识>.png`，README 的「六套主题」一节直接引用。
+  这是为了让「主题长什么样」有据可查——原来是张主色对照表，看不出视觉差异；
+  拿示意图又会有「README 与实际不一致」的隐患。改了组件库必须重跑，
+  这条已写进 `CONTRIBUTING.md` 第 9 条
+- `build_zip.py` 新增 `EXCLUDE_REL_PREFIXES`：`docs/images/`（README 配图）与 `tools/`
+  （开发辅助脚本）不进分发包——它们只服务于 GitHub 上的仓库本身
+- README 重做结构：新增「这个仓库是什么」（讲清 MIT + AGPL-3.0 的双授权边界与
+  「排版侧原样搬上游、只在发布侧加东西」的分工）与「六套主题」配图页；
+  「双关卡校验」「发布前体检」升为独立章节，license 徽章改为 MIT + AGPL-3.0
 
 ### Fixed
 

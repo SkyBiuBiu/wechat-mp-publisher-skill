@@ -35,6 +35,12 @@ EXCLUDE_FILES = {
 }
 EXCLUDE_EXTS = {".pyc", ".pyo", ".zip", ".swp", ".log"}
 
+# 相对仓库根的路径前缀 —— 这些只服务于 GitHub 上的仓库本身，不进分发包
+EXCLUDE_REL_PREFIXES = (
+    "docs/images/",   # README 的主题样例配图
+    "tools/",         # 开发辅助脚本（生成上面的配图，需本机 Chrome）
+)
+
 
 def read_version():
     vpath = os.path.join(ROOT, "VERSION")
@@ -60,6 +66,8 @@ def collect():
                 continue
             full = os.path.join(dirpath, name)
             rel = os.path.relpath(full, ROOT).replace("\\", "/")
+            if rel.startswith(EXCLUDE_REL_PREFIXES):
+                continue
             items.append((full, rel))
     items.sort(key=lambda x: x[1])
     return items
