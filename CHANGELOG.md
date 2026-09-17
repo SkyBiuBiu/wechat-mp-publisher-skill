@@ -100,6 +100,22 @@
   `assets/templates/article.template.html`
 - `publish.py` 的 `enhance` 子命令与 `--no-enhance` 参数
 
+### CI/CD
+
+- **发版流程改为「推送版本更新即自动打 tag + 发 Release」。** 原 `release.yml` 只监听
+  `push: tags: v*`，必须有人手工 `git tag && git push --tags` 才会动——0.5.0 的代码已经推上
+  main，tag 与 Release 却一直没有，就是这么漏的。现在：
+  - 触发条件增加「main 分支上 `VERSION` 文件发生变化」，同时保留 tag 推送与手动触发
+  - 新增两道发版前守卫：`VERSION` 必须是合法语义化版本；`CHANGELOG.md` 必须已有对应的
+    `## [x.y.z]` 段落——不满足直接失败，避免发出没有变更记录的 Release
+  - 步骤顺序改为「自检 → 打包 → 建 tag → 发 Release」，**都通过之后才创建 tag**，
+    不留指向坏提交的 tag
+  - 建 tag 幂等：远端已有同名 tag 就跳过
+- **为什么打 tag 与发 Release 必须写在同一个 workflow 里**：GitHub 规定「用仓库自带的
+  `GITHUB_TOKEN` 推送 tag，不会触发其他 workflow」（防递归）。若拆成「workflow A 打 tag →
+  workflow B 监听 `v*` 发版」，B 一次都不会跑。这条限制已作为注释写在 `release.yml` 顶部，
+  避免以后有人「顺手拆开优化」。
+
 ### Notes
 
 - 上游排版链路为 **AGPL-3.0**，授权原文保留在 `LICENSE-gzh-design`，README / SKILL.md

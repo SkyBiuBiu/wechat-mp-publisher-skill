@@ -109,13 +109,21 @@ python /path/to/repo/scripts/publish.py delete --media-id <验证稿id> -y   # �
 
 1. 更新 `VERSION` 与 `CHANGELOG.md`（把 `[Unreleased]` 内容移到新版本号下，标注日期）
 2. 跑 `python scripts/validate_skill.py`，必须全绿
-3. 提交并打 tag：
+3. 提交并推 main —— **不用手工打 tag**：
    ```bash
    git commit -am "chore(release): v0.2.0"
-   git tag -a v0.2.0 -m "v0.2.0"
-   git push origin main --tags
+   git push origin main
    ```
-4. GitHub Actions 的 `release.yml` 会自动打包 zip 并挂到 Release 上
+4. `release.yml` 检测到 `VERSION` 变化后自动完成：校验版本号与 CHANGELOG 段落 → 自检 →
+   打包 → 创建并推送 tag `v<版本号>` → 建 Release 并挂上 zip
+
+只想发版、不想带代码改动时，两条备用路径：手工推 tag（`git push origin v0.2.0`），
+或在 Actions 页面手动触发 `Release` 工作流（按当前 `VERSION` 补发）。
+
+> **改 `release.yml` 前先读这条。** GitHub 规定「用仓库自带的 `GITHUB_TOKEN` 推送 tag
+> **不会**触发其他 workflow」（防递归）。所以**打 tag 与发 Release 必须写在同一个
+> workflow 里**——拆成「A 打 tag → B 监听 `v*` 发版」的话，B 一次都不会跑。
+> 这条限制同样写在 `release.yml` 顶部注释里。
 
 **提交信息格式**（便于自动生成 changelog）：
 

@@ -1,17 +1,37 @@
 name: Release
 
+# 触发方式
+#   1. 推送版本更新：main 分支上 VERSION 文件被改动 → 自动打 tag 并发布 Release
+#   2. 手动推 v* 标签：直接发布该标签（保留原有用法）
+#   3. Actions 页面手动触发（workflow_dispatch）：按当前 VERSION 补发
+#
+# 为什么「打 tag」与「发 Release」必须写在同一个 workflow 里
+#   GitHub 有一条硬规则：用仓库自带的 GITHUB_TOKEN 推送 tag，**不会**触发其他
+#   workflow（防止递归触发）。所以「workflow A 打 tag → workflow B 监听 v* 发版」
+#   这种拆法永远不会生效——B 一次都不会跑。必须自包含。
+#   代价：本文件同时承担「打 tag」与「发版」两件事，改的时候别拆开。
+
 on:
   push:
-    tags:
-      - "v*"
+    branches: [main]
+    tags: ["v*"]
+    paths:
+      # 路径过滤只作用于分支推送，对 tag 推送不生效（GitHub 明确行为）。
+      # 因此推 v* 标签照样能触发，而 main 上只有动了 VERSION 才触发。
+      - "VERSION"
   workflow_dispatch:
 
 permissions:
   contents: write
 
+# 同一 ref 只允许一个发布任务在跑，避免并发重复打 tag
+concurrency:
+  group: release-${{ github.repository }}-${{ github.ref }}
+  cancel-in-progress: false
+
 jobs:
   release:
-    name: 构建并发布
+    name: 打 tag 并发布
     runs-on: ubuntu-latest
     steps:
       - name: 检出代码
@@ -24,35 +44,75 @@ jobs:
         with:
           python-version: "3.12"
 
-      - name: 发布前自检（必须全绿）
-        run: python scripts/validate_skill.py
-
-      - name: 读取版本号
+      # ---------------------------------------------------------------
+      # 版本号解析：VERSION 是唯一事实来源
+      # ---------------------------------------------------------------
+      - name: 解析并校验版本号
         id: ver
         run: |
-          VERSION="$(cat VERSION)"
-          echo "version=$VERSION" >> "$GITHUB_OUTPUT"
-          echo "tag=${GITHUB_REF_NAME}" >> "$GITHUB_OUTPUT"
-          echo "版本：$VERSION / 标签：${GITHUB_REF_NAME}"
-
-      - name: 校验标签与 VERSION 一致
-        run: |
           set -e
-          VERSION="$(cat VERSION)"
-          TAG="${GITHUB_REF_NAME#v}"
-          if [ "$VERSION" != "$TAG" ]; then
-            echo "::error::VERSION($VERSION) 与标签($TAG) 不一致，请同步后再发版"
+          V="$(tr -d ' \t\r\n' < VERSION)"
+          if ! printf '%s' "$V" | grep -Eq '^[0-9]+\.[0-9]+\.[0-9]+$'; then
+            echo "::error::VERSION 内容不是合法的语义化版本：'$V'"
             exit 1
           fi
+          echo "version=$V" >> "$GITHUB_OUTPUT"
+          echo "tag=v$V" >> "$GITHUB_OUTPUT"
+          echo "→ 版本 $V，标签 v$V"
+
+      - name: 校验 CHANGELOG 已记录该版本
+        run: |
+          set -e
+          V="${{ steps.ver.outputs.version }}"
+          if ! grep -qE "^## \[$V\]" CHANGELOG.md; then
+            echo "::error::CHANGELOG.md 里找不到 '## [$V]' 段落；先把 [Unreleased] 的内容归到该版本号下再发版"
+            exit 1
+          fi
+          echo "OK：CHANGELOG 已包含 [$V]"
+
+      - name: 校验标签与 VERSION 一致（tag 触发时）
+        if: ${{ startsWith(github.ref, 'refs/tags/') }}
+        run: |
+          set -e
+          T="${GITHUB_REF_NAME#v}"
+          V="${{ steps.ver.outputs.version }}"
+          if [ "$T" != "$V" ]; then
+            echo "::error::标签($T) 与 VERSION($V) 不一致，请同步后再发版"
+            exit 1
+          fi
+          echo "OK：标签与 VERSION 一致"
+
+      # ---------------------------------------------------------------
+      # 先自检 + 打包，都过了才动 tag —— 避免留下指向坏提交的 tag
+      # ---------------------------------------------------------------
+      - name: 发布前自检（必须全绿）
+        run: python scripts/validate_skill.py
 
       - name: 生成分发包
         run: python scripts/build_zip.py
 
+      - name: 自动打 tag（分支推送时；标签已存在则跳过）
+        if: ${{ !startsWith(github.ref, 'refs/tags/') }}
+        run: |
+          set -e
+          TAG="${{ steps.ver.outputs.tag }}"
+          if [ -n "$(git ls-remote --tags origin "refs/tags/$TAG")" ]; then
+            echo "标签 $TAG 已存在于远端，跳过创建"
+          else
+            git config user.name  "github-actions[bot]"
+            git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+            git tag -a "$TAG" -m "Release $TAG"
+            git push origin "refs/tags/$TAG"
+            echo "已创建并推送标签 $TAG"
+          fi
+
       - name: 创建 Release 并附加 zip
         uses: softprops/action-gh-release@v2
         with:
-          name: v${{ steps.ver.outputs.version }}
+          tag_name: ${{ steps.ver.outputs.tag }}
+          name: ${{ steps.ver.outputs.tag }}
           files: dist/*.zip
           generate_release_notes: true
           draft: false
           prerelease: false
+          make_latest: true

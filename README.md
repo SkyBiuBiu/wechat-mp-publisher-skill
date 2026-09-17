@@ -409,21 +409,29 @@ wechat-mp-publisher-skill/
 ## 发版
 
 遵循[语义化版本](https://semver.org/lang/zh-CN/)，变更记录在 [`CHANGELOG.md`](CHANGELOG.md)。
+**不用手工打 tag** —— 改完 `VERSION` 推到 main，流水线自己会打 tag 并发 Release。
 
 ```bash
-# 改完先自检
+# 1. 改 VERSION（例 0.5.0 → 0.5.1），并把 CHANGELOG 的 [Unreleased] 归到新版本号下
+# 2. 本地先自检 + 验证打包链路
 python scripts/validate_skill.py
-
-# 本地验证打包链路
 python scripts/build_zip.py
 
-# 发版：改 VERSION 与 CHANGELOG → 打 tag → 推
-git commit -am "chore(release): v0.5.0"
-git tag -a v0.5.0 -m "v0.5.0"
-git push origin main --tags
+# 3. 提交并推 main（不用推 tag）
+git commit -am "chore(release): v0.5.1"
+git push origin main
 ```
 
-推 tag 会触发 `release.yml`：跑自检、校验 tag 与 `VERSION` 一致、打包 zip、挂到 Release。`ci.yml` 在每次 push / PR 时跑自检 + gitleaks + 打包验证。
+推上去后 `release.yml` 自动跑完：校验 `VERSION` 是合法语义化版本 → 校验 `CHANGELOG.md`
+已有该版本段落 → 自检 → 打包 → 创建并推送 tag `v<版本号>` → 建 Release 并挂上 zip。
+前两步校验任一不过就直接失败，不会发出没有变更记录的 Release。
+
+手工推 tag（`git push origin v0.5.1`）或在 Actions 页面手动触发 `Release` 这两条路也保留。
+
+| 流水线 | 触发 | 做什么 |
+|---|---|---|
+| `ci.yml` | 每次 push / PR | 自检（Python 3.9 + 3.12）+ gitleaks 密钥扫描 + 打包链路验证 |
+| `release.yml` | `VERSION` 变更推 main、推 `v*` tag、手动触发 | 校验 → 自检 → 打包 → 打 tag → 发 Release |
 
 开发约定见 [`CONTRIBUTING.md`](CONTRIBUTING.md)。
 
