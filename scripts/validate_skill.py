@@ -12,7 +12,8 @@
   6. SKILL.md 中引用的仓库内相对路径是否真实存在
   7. 主题注册表（references/theme-index.md）与主题组件库文件是否一一对应
   8. 组件库源头无反模式（复用 component_lint.py —— 可验证循环的第一关）
-  9. 上游（gzh-design-skill, AGPL-3.0）署名与授权文件是否在位
+  9. 封面规格与配色（几何单一来源、六主题角色无静默回退、点睛色是否上场）
+  10. 上游（gzh-design-skill, AGPL-3.0）署名与授权文件是否在位
 
 退出码：0 = 全部通过，1 = 存在 FAIL。
 
@@ -50,6 +51,9 @@ REQUIRED = [
     "scripts/preflight.py",         # 接口侧硬约束体检
     "scripts/render_mermaid.py",    # 排版前的 mermaid 预渲染
     "scripts/make_assets.py",       # 封面生成
+    "scripts/cover_spec.py",        # 封面几何规格与主题皮肤（make_assets 的依赖）
+    "scripts/cover_wall.py",        # 封面墙（全部主题并排验收）
+    "scripts/theme_vars.py",        # 主题变量表解析（插图/封面/代码块共用）
     "scripts/watch_ip.py",          # IP 白名单监听
     "scripts/build_zip.py",         # 打包
     "scripts/validate_skill.py",    # 本文件
@@ -352,7 +356,104 @@ def check_component_lint():
         ok("组件库源头关", "{} 个库全部无反模式".format(len(refs)))
 
 
-# ---- 9. 上游署名 -------------------------------------------------------------
+# ---- 9. 封面规格与配色（几何单一来源 + 点睛色不许静默失效） -------------------
+def check_cover_spec():
+    """封面的两道护栏。
+
+    为什么需要它：封面长期有两个**不报错**的毛病 ——
+      · 几何散在 make_cover 的绘制逻辑里，改多了就漂开，没人能断言"规格是什么"；
+      · 主题登记的强调色一直没被用上（橄榄手记 `#ed7b2f`、石墨极简 `#F97316`），
+        主色是墨黑/石墨灰的主题封面因此整张没有颜色，且**不报错**。
+    下面把这两件事变成可自动判定的项。判定依据写在每条的注释里。
+    """
+    try:
+        import cover_spec
+        import theme_vars
+    except ImportError as e:
+        fail("封面规格", "无法加载 cover_spec.py / theme_vars.py：{}".format(e))
+        return
+
+    # ① 规格自身的一致性：比例、元素是否出画布、基线顺序、环形意象位置
+    probs = cover_spec.spec_problems()
+    if probs:
+        fail("封面规格", "；".join(probs[:4]))
+    else:
+        c = cover_spec.SPEC["canvas"]
+        ok("封面规格", "几何自洽（画布 {}x{} @{}x，比例 {:.2f}:1）".format(
+            c["w"], c["h"], c["scale"], float(c["w"]) / c["h"]))
+
+    # ② 画布比例必须与 preflight 的判定同源 —— 那是微信列表页裁切的硬约束，
+    #    两处各写一个数就会漂；这里直接从 preflight.py 读出来比对
+    pf = os.path.join(HERE, "preflight.py")
+    m = re.search(r"COVER_RATIO\s*=\s*([0-9.]+)", read(pf)) if os.path.isfile(pf) else None
+    if not m:
+        warn("封面对齐 preflight", "读不到 preflight.COVER_RATIO，跳过比对")
+    else:
+        want = float(m.group(1))
+        have = float(cover_spec.SPEC["canvas"]["w"]) / cover_spec.SPEC["canvas"]["h"]
+        if abs(have - want) > 0.02:
+            fail("封面对齐 preflight", "画布比例 {:.2f} 与 COVER_RATIO {:.2f} 不一致".format(have, want))
+        else:
+            ok("封面对齐 preflight", "画布比例与 WX108 判定同源（{:.2f}:1）".format(want))
+
+    # ③ 六套主题的封面角色必须**全部**取到值：任一为 None 都会静默回退兜底色
+    roles = ("primary", "title", "body", "aux", "light", "accent")
+    bad, fallen = [], []
+    for tid in THEMES:
+        t = theme_vars.asset_theme(tid)
+        if not t:
+            bad.append("{}(整体取不到配色)".format(tid))
+            continue
+        miss = [r for r in roles if t.get(r) is None]
+        if miss:
+            bad.append("{}（缺 {}）".format(tid, "/".join(miss)))
+        elif not t["accent_own"]:
+            fallen.append(tid)
+    if bad:
+        fail("封面配色角色", "；".join(bad))
+    else:
+        ok("封面配色角色", "{} 套主题的 {} 个角色全部命中".format(len(THEMES), len(roles)))
+
+    # ④ 主题**登记了点睛色**时，点睛色不许等于主色 —— 等于就等于没用上。
+    #    没登记点睛色的主题（摸鱼绿/红白/摸鱼票据风）豁免，不需要人工维护白名单：
+    #    判定条件是"速查表里能不能解析出 accent"，自动成立。
+    unused = []
+    for tid in THEMES:
+        t = theme_vars.tokens(tid, "cover")
+        if t["pairs"] and t["accent"]:
+            got = theme_vars.asset_theme(tid)
+            if got and got["accent"] == got["primary"]:
+                unused.append("{}({})".format(tid, t["accent"]))
+    if unused:
+        fail("点睛色是否上场", "登记了点睛色却与主色相同：" + "、".join(unused))
+    else:
+        ok("点睛色是否上场", "登记了点睛色的主题都已用上{}".format(
+            "；未登记、按设计回退主色的：" + "、".join(sorted(fallen)) if fallen else ""))
+
+    # ⑤ 皮肤表只能登记"已注册主题"，否则是漏登记 theme-index.md
+    index = os.path.join(ROOT, "references", "theme-index.md")
+    if os.path.isfile(index):
+        registered = set(re.findall(r"theme-([A-Za-z0-9_-]+)\.md", read(index))) - {"generator"}
+        extra = sorted(set(cover_spec.THEME_SKINS) - registered)
+        if extra:
+            fail("封面皮肤表", "皮肤表里有未注册主题：" + "、".join(extra))
+        else:
+            ok("封面皮肤表", "{} 套皮肤与主题注册表一致".format(len(cover_spec.THEME_SKINS)))
+
+    # ⑥ 几何不许回潮：make_cover 里不该再出现字面坐标（一律读 SPEC）。
+    #    只查这个函数 —— 底纹/插图的内部比例不属于封面规格。
+    src = read(os.path.join(HERE, "make_assets.py"))
+    m = re.search(r"\ndef make_cover\(.*?(?=\ndef |\Z)", src, re.S)
+    if m:
+        lits = re.findall(r"(?<![\w.])\d+(?:\.\d+)?\s*\*\s*S", m.group(0))
+        if lits:
+            warn("封面几何收口", "make_cover 里仍有字面坐标 {} 处（{}）——"
+                 "应先收进 cover_spec.SPEC".format(len(lits), "、".join(sorted(set(lits))[:5])))
+        else:
+            ok("封面几何收口", "make_cover 全部坐标读自 SPEC")
+
+
+# ---- 10. 上游署名 -------------------------------------------------------------
 def check_upstream():
     lic = os.path.join(ROOT, "LICENSE-gzh-design")
     if not os.path.isfile(lic):
@@ -381,7 +482,8 @@ def main():
 
     for fn in (check_required, check_frontmatter, check_version,
                check_python_syntax, check_secrets, check_references,
-               check_themes, check_component_lint, check_upstream):
+               check_themes, check_component_lint, check_cover_spec,
+               check_upstream):
         try:
             fn()
         except Exception as e:                       # noqa: BLE001

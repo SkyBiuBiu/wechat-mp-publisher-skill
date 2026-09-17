@@ -134,6 +134,11 @@
 > 都按各自主题重渲）+ 一份并排对比页；加 `--push` 逐版推草稿箱。
 > 这个脚本在 `scripts/` 里，**分发包自带**。
 
+> 封面在六套主题下长什么样：`python scripts/cover_wall.py --title "..." -o wall`
+> 出一张「同一篇文章 × 全部主题」的封面墙（每格标注主色 / 点睛色 / 皮肤）。
+> 同色主题（摸鱼绿与摸鱼票据风主色都是 `#059669`）能不能一眼分开、近无彩主题
+> （石墨极简 / 留白禅意）有没有色彩身份，都在这张图上判断。**分发包自带。**
+
 > 注意 `tools/` 是仓库开发脚本（下面两个配图/对照页生成器），`build_zip.py` 有意不把它
 > 打进分发包，需克隆仓库使用。
 
@@ -324,8 +329,10 @@ python scripts/publish.py <子命令> [参数]
 | `scripts/extract_docx.py` | Word(.docx) → Markdown |
 | `scripts/preflight.py` | 发布前体检：P0/P1/P2 三级清单，`--json` / `--warn-only` / `--quiet` |
 | `scripts/watch_ip.py` | 轮询等白名单生效，通了自动建草稿。`-i 秒` 调间隔，`-m 次数` 限次，`--no-preflight` 透传 |
-| `scripts/make_assets.py` | 生成封面（900×383），需 `pillow`；配色跟 `config.json` 的 `theme` 走，`--theme` / `--dark` 可覆盖，`--title/--subtitle/--date` 可配；`--motif ring` 在右侧空处点一个环形循环意象（`--motif-nodes` 定节点数），`--only cover` 只出封面 |
-| `scripts/validate_skill.py` | 仓库自检：结构 / frontmatter / 版本 / 语法 / 密钥 / 引用 / 主题注册表 / 组件库源头关 |
+| `scripts/make_assets.py` | 生成封面（900×383），需 `pillow`；配色跟 `config.json` 的 `theme` 走，文案读 `config.cover`（`--brand/--title/--subtitle/--date/--motif*` 可覆盖），`--dark` 回内置深色版式；`--motif ring` 在右侧空处点一个环形循环意象（`--motif-nodes` 定节点数），`--only cover` 只出封面 |
+| `scripts/cover_spec.py` | **封面的几何规格**（`SPEC`）与**主题质感皮肤**（`THEME_SKINS`）的单一来源：底色、竖条、描边、圆角、底纹、字型。`make_cover` 只按规格画，不写字面坐标；直接跑它可自检规格 |
+| `scripts/cover_wall.py` | 出「同一篇文章 × 全部主题」的**封面墙**（每格标注主题/主色/点睛色/皮肤）：换主题前肉眼看一眼封面，也是新增主题的验收口 |
+| `scripts/validate_skill.py` | 仓库自检：结构 / frontmatter / 版本 / 语法 / 密钥 / 引用 / 主题注册表 / 组件库源头关 / 封面规格与配色 |
 | `scripts/build_zip.py` | 打分发 zip 到 `dist/`，自动排除密钥与本机状态 |
 
 ## 配置项
@@ -347,6 +354,8 @@ python scripts/publish.py <子命令> [参数]
 | `article.content_file` | ✅ | 正文 HTML，路径相对配置文件所在目录 |
 | `article.cover_file` | ✅ | 封面图，走永久素材接口，建议 900×383（2.35:1） |
 | `article.content_source_url` | | 文末「阅读原文」跳转地址，留空不显示 |
+| `cover.brand` / `cover.title` / `cover.subtitle` / `cover.date` | | 封面文案，供 `make_assets.py` 读取（`cover.title` 留空则复用 `article.title`）。优先级：命令行 > `cover` 段 > `article.title` > 内置默认 |
+| `cover.motif` / `motif_nodes` / `motif_label` / `motif_caption` | | 封面右侧环形意象：`ring` 画环、节点数按文章环节数填 |
 | `need_open_comment` | | `1` 开评论 |
 | `only_fans_can_comment` | | `1` 仅粉丝可评 |
 
@@ -368,8 +377,10 @@ wechat-mp-publisher-skill/
 │   ├── preflight.py                # 发布前体检：接口侧硬约束
 │   ├── render_mermaid.py           # mermaid → PNG 预渲染（含可读性体检与自动换方向）
 │   ├── highlight_code.py           # 代码围栏 → 按语言着色的代码块
-│   ├── theme_vars.py               # 主题变量表的唯一解析入口（上面两个共用）
+│   ├── theme_vars.py               # 主题变量表的唯一解析入口（插图/封面/代码块共用）
 │   ├── make_assets.py              # 封面生成（需 pillow）
+│   ├── cover_spec.py               # 封面几何规格 + 主题质感皮肤（单一来源）
+│   ├── cover_wall.py               # 全部主题的封面墙（换主题前预览 / 新主题验收）
 │   ├── build_theme_showcase.py     # 同一篇成稿 × 全部主题，出六版成稿 + 对比页（可推草稿）
 │   ├── watch_ip.py                 # 白名单生效轮询
 │   ├── validate_gzh_html.py        # 产物关（上游）
@@ -477,7 +488,7 @@ git push origin main
 
 本仓库分两部分：
 
-- **本仓库自有部分**（发布链路：`scripts/publish.py`、`preflight.py`、`render_mermaid.py`、`highlight_code.py`、`theme_vars.py`、`make_assets.py`、`watch_ip.py`、`validate_skill.py`、`build_zip.py`、`tools/`、`docs/`、`references/wechat-api-reference.md`）—— [MIT](LICENSE) © 2026 Sky (SkyBiuBiu)
+- **本仓库自有部分**（发布链路：`scripts/publish.py`、`preflight.py`、`render_mermaid.py`、`highlight_code.py`、`theme_vars.py`、`make_assets.py`、`cover_spec.py`、`cover_wall.py`、`build_theme_showcase.py`、`watch_ip.py`、`validate_skill.py`、`build_zip.py`、`tools/`、`docs/`、`references/wechat-api-reference.md`）—— [MIT](LICENSE) © 2026 Sky (SkyBiuBiu)
 - **排版链路**（`references/theme-*.md`、`common-components.md`、`theme-generator.md`、`format-normalize.md`、`eval-cases.md`、`theme-index.md`、`assets/preview-template.html`、`assets/sample-article.md`、`scripts/validate_gzh_html.py`、`component_lint.py`、`wrap_preview.py`、`extract_docx.py`）—— 来自 [**isjiamu/gzh-design-skill**](https://github.com/isjiamu/gzh-design-skill)，原创 **甲木 × 摸鱼小李**，授权 **AGPL-3.0**，原文见 [`LICENSE-gzh-design`](LICENSE-gzh-design)。
 
 > 排版链路的署名与授权声明**不得删除**；这部分内容的修改版、Fork、二次分发须以 AGPL-3.0（或兼容协议）公开发布，即使只作为网络服务提供也要开源。

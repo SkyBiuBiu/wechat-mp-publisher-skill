@@ -297,17 +297,73 @@ python scripts/make_assets.py -c work/config.json -o work/assets \
 
 需 `pillow`：`pip install pillow`。输出 900×383 封面（2.35:1）与一张正文插图占位（`--only cover` 可只出封面）。
 **配色会自动跟着 `config.json` 的 `theme` 走**——从主题库的「设计变量速查表」里解析主色调、标题色、
-正文色、辅助文字色、极浅底色，所以封面和正文天然成套。想手动指定用 `--theme moyu-green`，
+正文色、辅助文字色、极浅底色、点睛色，所以封面和正文天然成套。想手动指定用 `--theme moyu-green`，
 想让封面回到内置的深色橙调版式用 `--dark`。
 
-封面右侧那块极淡主色默认是空的。讲循环、流程、分步的文章可以让它点一个环形意象——
-环上 N 个节点、顺时针箭头、圆心两行文字，节点数按文章里的环节数填：
+#### 封面文案放 config 里，不用每次拼参数
+
+`config.json` 加一段 `cover` 即可（见 `assets/templates/config.example.json`）：
+
+```json
+"cover": {
+  "brand": "公众号 · 工程笔记",
+  "title": "",                    // 留空则复用 article.title
+  "subtitle": "一次循环的七个环节",
+  "date": "2026.09",
+  "motif": "ring", "motif_nodes": 7,
+  "motif_label": "LOOP", "motif_caption": "7 STEPS"
+}
+```
+
+**优先级：命令行参数 > `cover` 段 > `article.title` > 内置默认**（运行时会打印文案来源，省得猜）。
+没有 `cover` 段的老配置照常工作。
+
+#### 封面右侧的环形意象
+
+讲循环、流程、分步的文章可以让它点一个环形意象——环上 N 个节点、顺时针箭头、圆心两行文字，
+节点数按文章里的环节数填：
 
 ```bash
 python scripts/make_assets.py -c work/config.json -o work/assets \
     --title "一次循环的七个环节" --subtitle "Agent Loop 拆帧" --date "2026.09" \
     --motif ring --motif-nodes 7 --motif-caption "7 STEPS" --only cover
 ```
+
+#### 版式规格与主题皮肤（改封面看这里）
+
+封面的**几何规格**在 [`scripts/cover_spec.py`](../scripts/cover_spec.py) 的 `SPEC` 里，是唯一来源；
+`make_cover()` 不写字面坐标，全部读规格。比例 **900:383（2.35:1）是硬约束**（微信列表页按此裁切，
+`preflight.py` 的 WX108 会校验），动几何别碰它。跑 `python scripts/cover_spec.py` 可自检规格
+（比例、元素是否出画布、基线顺序、环形意象位置）。
+
+**主题气质由"皮肤"决定，不靠改主题库色值**：同一套几何下，底色倾向、竖条宽度与颜色、
+外框描边、圆角、底纹、字型各自不同：
+
+| 主题 | 竖条 | 底色 | 描边 | 圆角 | 底纹 | 标题字型 |
+|---|---|---|---|---|---|---|
+| 摸鱼绿 | 8px 主色 | 极浅灰 | — | 大（60） | — | 黑体 |
+| 红白色系 | 8px 主色 | 极淡红 | — | 中（40） | — | 黑体 |
+| 石墨极简风 | 5px 石墨灰 | 极浅灰 | — | 小（24） | — | 黑体 |
+| 留白禅意风 | 3px 墨绿 | 纯白 | — | 直角 | 一条极细底线 | **衬线** |
+| 摸鱼票据风 | 12px 黑 | 米黄纸感 | **2px 黑硬边** | 直角 | 撕票虚线 | 黑体 |
+| 橄榄手记 | 8px 点睛橙 | 米白 | — | 小（6） | — | 黑体 |
+
+这张表就是"摸鱼绿 vs 摸鱼票据风（主色同为 `#059669`）""石墨极简 vs 留白禅意（都偏无彩）"
+能一眼分开的原因。**点睛色**（`accent`）单独占一个角色：主色是墨黑/石墨灰的主题，
+用它做环、竖条、品牌方块与分隔线——否则封面会整张没有颜色（橄榄手记的橙 `#ed7b2f`
+与石墨极简的橙 `#F97316` 就是这么上场的）。没登记点睛色的主题回退主色，观感只是"更足"。
+未登记皮肤的新主题会按主色彩度自动推导（近无彩则自动用点睛色）。
+
+#### 一次看全六套封面
+
+```bash
+python scripts/cover_wall.py --title "Agent Loop 七环节" --subtitle "一次循环的七个环节" \
+    --date 2026.09 --motif ring --motif-nodes 7 --motif-caption "7 STEPS" -o wall
+```
+
+出 `wall/cover-wall.png`（每格标注主题名 / 主色 / 点睛色 / 皮肤摘要）与各主题的
+`wall/<theme>/cover.png`。**新增主题登记进 `theme-index.md` 后会自动出现在墙里**——
+没出现就说明登记漏了；这也是验收"新主题封面会不会又变成一片灰"的地方。
 
 ---
 

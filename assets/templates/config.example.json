@@ -36,5 +36,26 @@
 
     "_content_source_url": "原文链接，即文末「阅读原文」跳转地址。留空则不显示",
     "content_source_url": ""
+  },
+
+  "_cover": "封面文案。可选：整段删掉也能跑（那时用命令行参数或内置默认）。有这一段时 make_assets.py 直接读这里，不用每次拼一长串参数。优先级：命令行参数 > 本段 > article.title > 内置默认",
+  "cover": {
+    "_brand": "封面左上角署名 / 栏目名",
+    "brand": "公众号 · 工程笔记",
+
+    "_title": "封面主标题。留空则复用 article.title。过长自动折两行（英文断在空格处、中文按宽度断）",
+    "title": "",
+
+    "_subtitle": "封面副标题，一句话摘要",
+    "subtitle": "一次循环的七个环节",
+
+    "_date": "封面日期，留空不显示",
+    "date": "2026.09",
+
+    "_motif": "封面右侧的意象图：none=不画，ring=环形节点 + 顺时针箭头（讲循环/分步的文章用）。节点数按文章里的环节数填",
+    "motif": "ring",
+    "motif_nodes": 7,
+    "motif_label": "LOOP",
+    "motif_caption": "7 STEPS"
   }
 }

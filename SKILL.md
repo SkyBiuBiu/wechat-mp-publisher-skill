@@ -274,13 +274,24 @@ cp <skill>/assets/templates/config.example.json wechat-publish/config.json
 ### Step 3：封面
 
 ```bash
-# 配色跟着 config 的 theme 走；-o 是输出目录
+# 配色与皮肤跟着 config 的 theme 走，文案读 config 的 cover 段；-o 是输出目录
 python <skill>/scripts/make_assets.py -c wechat-publish/config.json -o wechat-publish/assets \
     --title "文章标题" --subtitle "副标题" --date "2026.09"
 ```
+
 需 `pillow`。默认出两张：`cover.png`（900×383，微信推荐比例）和 `diagram.png`（正文插图占位）。
-**配色从主题库 `references/theme-<id>.md` 的「设计变量速查表」解析**（主色调/标题色/正文色/辅助文字/极浅底），
-封面与正文成套。`--theme <id>` 手动指定，`--dark` 回到旧的深色橙调版式。`--only cover` 只要封面。
+**配色从主题库 `references/theme-<id>.md` 的「设计变量速查表」解析**（主色调/标题色/正文色/辅助文字/
+极浅底/**点睛色**），封面与正文成套。`--theme <id>` 手动指定，`--dark` 回到旧的深色橙调版式。
+`--only cover` 只要封面。
+
+**文案优先放 `config.json` 的 `cover` 段**（brand/title/subtitle/date/motif…），命令行参数只做覆盖：
+优先级 **命令行 > `cover` 段 > `article.title` > 内置默认**，运行时会打印来源。别每次都拼一长串参数。
+
+**版式与皮肤**：几何规格在 `scripts/cover_spec.py` 的 `SPEC`（唯一来源，比例 900:383 是微信列表页
+裁切的硬约束）；主题气质由 `THEME_SKINS` 的皮肤决定——底色、竖条宽度与颜色、外框描边（票据的
+2px 黑硬边）、圆角、底纹（票据撕票虚线 / 禅意极细线）、字型（禅意衬线）。**同色主题靠皮肤区分，
+不要去改主题库色值**：摸鱼绿与摸鱼票据风主色同为 `#059669`、石墨极简与留白禅意都偏无彩，
+改色值会牵连正文排版。
 
 封面右侧那块极淡主色默认空着。讲**循环 / 流程 / 分步**的文章用 `--motif ring` 在那里点一个环形意象
 （N 个节点 + 顺时针箭头 + 圆心文字），`--motif-nodes` 填文章里的环节数：
@@ -292,6 +303,15 @@ python <skill>/scripts/make_assets.py -c wechat-publish/config.json -o wechat-pu
 ```
 
 圆心文字分主副两行（`--motif-label` 默认 `LOOP`、`--motif-caption` 默认空）。不想要意象就不加 `--motif`。
+
+想先看**全部主题的封面长什么样**再决定用哪套（也用于验收新主题）：
+
+```bash
+python <skill>/scripts/cover_wall.py --title "文章标题" --subtitle "副标题" --date "2026.09" \
+    --motif ring --motif-nodes 7 -o cover-wall
+```
+
+出 `cover-wall/cover-wall.png`，每格标注主题名 / 主色 / 点睛色 / 皮肤摘要。
 
 ### Step 4：发布前体检
 
@@ -348,8 +368,10 @@ python <skill>/scripts/publish.py draft -c wechat-publish/config.json
 | `publish.py delete --media-id XXX -y` | 删除指定草稿（破坏性，需显式给 id） |
 | `publish.py token -f` | 强制刷新 access_token（遇 40001 时用） |
 | `watch_ip.py --draft` | 轮询等白名单生效，通了自动建草稿 |
-| `make_assets.py` | 生成封面（需 pillow） |
-| `validate_skill.py` | 仓库自检（改完 skill 必跑） |
+| `make_assets.py` | 生成封面（需 pillow）；文案读 `config.cover`，`--motif ring` 加环形意象 |
+| `cover_spec.py` | 封面几何规格 + 主题皮肤（单一来源；直接跑它可自检规格） |
+| `cover_wall.py` | 出「同一篇文章 × 全部主题」的封面墙（换主题前预览 / 新主题验收） |
+| `validate_skill.py` | 仓库自检（改完 skill 必跑，含封面规格与配色护栏） |
 
 通用参数：`-c 路径` 指定配置（默认按「当前目录/config.json → 脚本目录/config.json」查找）、`-f` 强制刷新 token、`-y` 跳过发布确认。
 凭证也可用环境变量：`WECHAT_MP_APPID` / `WECHAT_MP_APPSECRET`。

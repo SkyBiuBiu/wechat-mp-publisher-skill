@@ -353,6 +353,17 @@ def patch_config(cfg, t, theme_id, src_dir, tdir, title_prefix):
     art["content_file"] = "article.html"
     art["cover_file"] = os.path.join("assets", "cover.png")
     cfg["theme"] = theme_id
+    # 封面文案收口进 config 的 cover 段：make_assets 直接读这里，
+    # 调用方不必再拼一长串 --brand/--title/--subtitle/--date/--motif…
+    # （同一份文案写在两处就一定会漂；这里只有"每版不同的副标题"是变量）
+    cfg["cover"] = {
+        "brand": "公众号 · 工程笔记",
+        "title": "Agent Loop 七环节",
+        "subtitle": "主题样张 · " + t["name"],
+        "date": "2026.09",
+        "motif": "ring", "motif_nodes": 7,
+        "motif_label": "LOOP", "motif_caption": "7 STEPS",
+    }
     return cfg
 
 
@@ -421,17 +432,11 @@ def main():
         io.open(os.path.join(tdir, "config.json"), "w", encoding="utf-8").write(
             json.dumps(cfg, ensure_ascii=False, indent=2))
 
-        # 4) 封面（配色跟着主题走）
+        # 4) 封面（配色与皮肤跟着主题走；文案取自 config 的 cover 段）
         if not args.no_cover:
             rc, log = run([PY, os.path.join(SCRIPTS, "make_assets.py"),
                            "-c", os.path.join(tdir, "config.json"), "-o", adir,
-                           "--theme", theme_id, "--only", "cover",
-                           "--brand", "公众号 · 工程笔记",
-                           "--title", "Agent Loop 七环节",
-                           "--subtitle", "主题样张 · " + t["name"],
-                           "--date", "2026.09",
-                           "--motif", "ring", "--motif-nodes", "7",
-                           "--motif-label", "LOOP", "--motif-caption", "7 STEPS"])
+                           "--only", "cover"])
             if rc != 0:
                 out("  [!] 封面生成失败（可用 --no-cover 跳过）")
 

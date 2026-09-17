@@ -62,15 +62,26 @@ _HEX_RE = re.compile(r"#[0-9A-Fa-f]{6}\b|#[0-9A-Fa-f]{3}\b")
 # 且不报错 —— 实测踩过：漏掉「米黄纸感背景」，摸鱼票据的暖纸底会被换成中性灰。
 SCHEMAS = {
     # 封面（make_assets.py）：副标题要「次要文字」档，日期要更浅的「辅助文字」档
+    #
+    # accent 的作用与 code 组同理（见下）：主色本身是墨黑/石墨灰时，色相是噪声，
+    # 封面会整张没有颜色 —— 橄榄手记的封面长期是灰白的，就因为它的主色是墨黑
+    # `#1e1f23`，而它登记的强调橙 `#ed7b2f` 无处可来。候选顺序刻意把"明确的
+    # 点睛色"排在前面，把"兼作点睛用的功能色"排后面：
+    #   · 橄榄手记 `强调橙 #ed7b2f`、石墨极简 `强调色 #F97316` —— 直接命中，正是其色彩身份；
+    #   · 留白禅意没有前三项，命中 `标签文字色 #3D5046`（深墨绿）而**不是**
+    #     `下划线标记色 #B5C8BC` —— 后者饱和度太低，画成 2px 分隔线/竖条会直接消失。
     "cover": {
         "primary": (["主色调", "主色", "主题墨色", "主题色", "主颜色"],
                     ("深", "浅", "背景", "极")),
         "title":   (["标题色"], ()),
         "body":    (["次要文字", "次要文字色", "正文色", "正文", "弱化文字"], ()),
         "aux":     (["辅助文字", "辅助文字色", "弱化文字", "注释/标签",
-                     "标签文字色", "标签色"], ()),
+                     "标签文字色", "标签色", "次要文字"], ()),
         "light":   (["极浅灰", "极浅灰底", "米白背景", "底色", "纯白底",
                      "浅灰背景", "米黄纸感背景", "主色调背景"], ("主色调",)),
+        "accent":  (["强调橙", "强调色", "点睛色", "标签文字色",
+                     "下划线标记色", "荧光笔色"],
+                    ("深", "浅", "背景", "底")),
     },
     # 插图（render_mermaid.py）：节点填充 / 线条 / 文字
     "diagram": {
@@ -231,11 +242,31 @@ def hue_of(color):
     return rgb2hsl(rgb(color))[0]
 
 
+def mix(a, b, t, triples=False):
+    """把 a 朝 b 混合 t（0~1），返回 rgb 三元组。入参默认是 `#hex`；`triples=True` 时传 rgb 三元组。
+
+    用途：某套主题的「辅助文字」和「次级文字」是同一个灰（摸鱼票据风只有
+    `次要文字 #888` 一个档位，cover 侧 aux/body 会取到同色），副标题与日期
+    同色就没有层次。此时把日期往底色方向提一点即可，不必让主题库为封面
+    多登记一个色值 —— 主题库是正文的规格，不该被插图/封面的需要牵着走。
+    """
+    pa = a if triples else rgb(a)
+    pb = b if triples else rgb(b)
+    t = max(0.0, min(1.0, t))
+    return tuple(int(round(pa[i] + (pb[i] - pa[i]) * t)) for i in range(3))
+
+
 def asset_theme(theme_id):
     """make_assets.py 需要的形式：色值转成 rgb 三元组。
 
     主色与标题色是封面排版的必需项，二者任一取不到就返回 None，
     让调用方退回内置深色版式（这是既有契约，别改成静默兜底）。
+
+    `accent` 是封面点睛色：主色本身无彩色（橄榄手记墨黑、石墨极简石墨灰）时，
+    封面会整张没有颜色识别度，那一处点睛就靠它。没有登记点睛色的主题
+    （摸鱼绿 / 红白 / 摸鱼票据风）回退成 primary —— 封面观感只是"更足"不变调。
+    `accent_own` 记录这个色是主题自己的点睛色还是回退来的，供自检护栏判断
+    "该主题明明登记了点睛色，却没被用上"（见 validate_skill.check_cover_spec）。
     """
     t = tokens(theme_id, "cover")
     if t["pairs"] is None or not (t["primary"] and t["title"]):
@@ -247,6 +278,8 @@ def asset_theme(theme_id):
         "body": rgb(t["body"] or t["title"]),
         "aux": rgb(t["aux"] or t["body"] or t["title"]),
         "light": rgb(t["light"] or "#FFFFFF"),
+        "accent": rgb(t["accent"] or t["primary"]),
+        "accent_own": bool(t["accent"]),
         "is_light": True,
         "missing": t["missing"],
     }
