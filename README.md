@@ -125,6 +125,10 @@
 > 配图怎么来的：`python tools/make_theme_previews.py`（同一段内容 × 六套主题，
 > 用真实组件装配后拿本机 Chrome 无头截图）。改了组件库就该重跑，否则图会跟实现对不上。
 
+> 代码块配色怎么看：`python tools/make_code_preview.py` 出一页
+> 「同一段代码 × 六套主题」的对照页（零依赖）。色值表看不出扎不扎眼，得眼睛看；
+> 这也是"自定义主题是否自动适配"的验收口——新主题登记后重跑，它该自动出现在页面里。
+
 ## 安装
 
 ### 作为技能
@@ -378,6 +382,7 @@ wechat-mp-publisher-skill/
 │   └── images/                     # README 的主题样例配图（不进分发包）
 ├── tools/
 │   └── make_theme_previews.py      # 生成上面的样例配图（需本机 Chrome，不进分发包）
+│   └── make_code_preview.py        # 「同一段代码 × 多套主题」着色对照页（零依赖）
 ├── assets/
 │   ├── preview-template.html       # 预览页外壳（带复制按钮）
 │   ├── sample-article.md           # 演示输入
