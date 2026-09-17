@@ -56,6 +56,7 @@ HTML_BLOCK_RE = re.compile(
     re.S | re.I)
 
 import theme_vars          # 同目录；主题变量表的唯一解析入口
+import fonts               # 同目录；字体预设（封面与流程图共用一份）
 
 # 图文正文的**手机**内容区宽度，出处与理由见 theme_vars.MOBILE_CONTENT_W。
 #
@@ -89,6 +90,17 @@ MIN_DISPLAY_W = 240
 PNG_BG = "FFFFFF"
 
 USER_AGENT = "wechat-mp-publisher-skill"
+
+# 图内文字的字体栈。默认沿用系统黑体；--font-preset 换成霞鹜文楷 / 思源宋体等
+# 时，浏览器侧靠 fonts.face_css() 的 @font-face 把字体文件喂进去 —— 在线通道
+# （mermaid.ink）看不到这些文件，所以换字体必须走本地渲染（见 render_local）。
+DEFAULT_FONT_FAMILY = "PingFang SC,Microsoft YaHei,sans-serif"
+
+# 本地渲染脚本（playwright 驱动本机 Chrome）与它的依赖查找
+LOCAL_JS = os.path.join(HERE, "mermaid_local.js")
+
+# mermaid.js 的来源：本机找不到副本时按需下载到这里缓存（assets/vendor/ 不进分发包）
+MERMAID_CDN = "https://cdn.jsdelivr.net/npm/mermaid@11/dist/mermaid.min.js"
 
 DEFAULT_TOKENS = {
     "primary": "#059669",
@@ -167,7 +179,7 @@ def theme_tokens(theme_id):
 
 
 # ------------------------------------------------------------------ 渲染
-def mermaid_config(toks):
+def mermaid_config(toks, font_family=None):
     return {
         "theme": "base",
         "themeVariables": {
@@ -177,12 +189,149 @@ def mermaid_config(toks):
             "lineColor": toks["muted"],
             "secondaryColor": toks["primary_soft"],
             "tertiaryColor": toks["card_bg"],
-            "fontFamily": "PingFang SC,Microsoft YaHei,sans-serif",
+            "fontFamily": font_family or DEFAULT_FONT_FAMILY,
             "fontSize": "{}px".format(toks.get("font_px") or FONT_PX),
         },
         "htmlLabels": False,
         "flowchart": {"htmlLabels": False},
     }
+
+
+# -------------------------------------------------------------- 本地渲染通道
+# mermaid.ink 的字形由对方服务器决定，font-family 写了它不认识的名字也白搭。
+# 想让流程图真的用上指定字体，只能本地渲染：把 mermaid.js + @font-face 喂给
+# 本机 Chrome（playwright 驱动），SVG 与 PNG 一次拿到。
+_LOCAL = {"state": None, "why": "", "node": None, "mermaid_js": None}
+
+
+def find_node():
+    """找一个能用的 node。找不到就返回 None（调用方据此退回在线通道）。"""
+    env = os.environ.get("WMP_NODE")
+    if env and os.path.isfile(env):
+        return env
+    for p in (shutil.which("node"), shutil.which("node.exe"),
+              os.path.join(os.path.expanduser("~"), ".workbuddy", "binaries",
+                           "node", "versions", "22.22.2-2", "node.exe"),
+              r"C:\Program Files\nodejs\node.exe"):
+        if p and os.path.isfile(p):
+            return p
+    return None
+
+
+def find_mermaid_js():
+    """mermaid 库在哪：环境变量 > skill 自带 vendor > 本机 npm 目录。"""
+    env = os.environ.get("WMP_MERMAID_JS")
+    if env and os.path.isfile(env):
+        return env
+    cands = [os.path.join(SKILL_ROOT, "assets", "vendor", "mermaid.min.js")]
+    home = os.path.expanduser("~")
+    for base in (os.path.join(home, ".workbuddy", "binaries", "node",
+                              "workspace", "node_modules"),
+                 os.path.join(home, "AppData", "Roaming", "npm", "node_modules")):
+        cands.append(os.path.join(base, "mermaid", "dist", "mermaid.min.js"))
+    for c in cands:
+        if os.path.isfile(c):
+            return c
+    return None
+
+
+def fetch_mermaid_js():
+    """本地没有 mermaid.js 时按需拉一份到 assets/vendor/ 缓存起来。
+
+    为什么值得这一次网络请求：本地渲染通道是"换字体 + 不把图表内容发出去"的
+    唯一实现路径，卡在没有 mermaid.js 上太可惜。只在确实要用本地渲染时才拉，
+    一次约 3MB，之后走缓存。拉不到就照旧退回在线通道（不报错、不阻塞）。
+    """
+    dst = os.path.join(SKILL_ROOT, "assets", "vendor", "mermaid.min.js")
+    url = os.environ.get("WMP_MERMAID_CDN") or MERMAID_CDN
+    try:
+        os.makedirs(os.path.dirname(dst), exist_ok=True)
+        req = urllib.request.Request(url, headers={"User-Agent": USER_AGENT})
+        with urllib.request.urlopen(req, timeout=120) as resp:
+            data = resp.read()
+        if len(data) < 100000:
+            raise RuntimeError("下载内容过小（{} 字节）".format(len(data)))
+        io.open(dst, "wb").write(data)
+        out("[i] 已缓存 mermaid.js → {}".format(dst))
+        return dst
+    except Exception as e:                           # noqa: BLE001
+        print("[!] 拉取 mermaid.js 失败（{}）：本地渲染不可用".format(e), file=sys.stderr)
+        return None
+
+
+def node_env():
+    """给 node 一个能 require 到 playwright-core 的 NODE_PATH。"""
+    env = dict(os.environ)
+    ws = os.path.join(os.path.expanduser("~"), ".workbuddy", "binaries",
+                      "node", "workspace", "node_modules")
+    parts = [p for p in (env.get("NODE_PATH"), ws) if p and os.path.isdir(p)]
+    if parts:
+        env["NODE_PATH"] = os.pathsep.join(parts)
+    return env
+
+
+def local_ready(allow_fetch=True):
+    """本机能不能跑本地渲染。结论缓存，只探一次。"""
+    if _LOCAL["state"] is not None:
+        return _LOCAL["state"]
+    node = find_node()
+    js = find_mermaid_js()
+    if not js and node and allow_fetch and os.environ.get("WMP_NO_FETCH") != "1":
+        js = fetch_mermaid_js()
+    if not node:
+        _LOCAL["why"] = "没找到 node（可设 WMP_NODE 指定）"
+    elif not js:
+        _LOCAL["why"] = ("没找到 mermaid.js（可设 WMP_MERMAID_JS，或 npm i mermaid "
+                         "后放进 assets/vendor/）")
+    elif not os.path.isfile(LOCAL_JS):
+        _LOCAL["why"] = "缺少 " + LOCAL_JS
+    else:
+        probe = subprocess.run(
+            [node, "-e", "require('playwright-core')"],
+            capture_output=True, text=True, env=node_env(), timeout=60)
+        if probe.returncode != 0:
+            _LOCAL["why"] = "require('playwright-core') 失败：" + \
+                (probe.stderr or "").strip().splitlines()[-1][:120]
+        else:
+            _LOCAL["node"], _LOCAL["mermaid_js"] = node, js
+            _LOCAL["state"] = True
+            return True
+    _LOCAL["state"] = False
+    return False
+
+
+def render_local(src, out_path, toks, opts, width, svg_out=None):
+    """本地渲染一张图。失败抛 RuntimeError（调用方决定是否退回在线通道）。
+
+    `out_path` 传 None = 只要 SVG 不栅格化（可读性体检就用这个，省一次截图）。
+    """
+    if not local_ready():
+        raise RuntimeError("本地渲染不可用：" + _LOCAL["why"])
+    td = tempfile.mkdtemp(prefix="wmp-mml-")
+    params = os.path.join(td, "params.json")
+    io.open(params, "w", encoding="utf-8").write(json.dumps({
+        "mmd": src,
+        "config": mermaid_config(toks, opts.get("font_family")),
+        "out": out_path or "",
+        "width": int(width),
+        "scale": int(opts["scale"]),
+        "bg": "#" + PNG_BG,
+        "fontCss": opts.get("font_css") or "",
+        "mermaidJs": _LOCAL["mermaid_js"],
+        "svgOut": svg_out or "",
+    }, ensure_ascii=False))
+    cmd = [_LOCAL["node"], LOCAL_JS, params]
+    try:
+        p = subprocess.run(cmd, capture_output=True, text=True,
+                           encoding="utf-8", errors="replace",
+                           env=node_env(), timeout=180)
+    except (OSError, subprocess.TimeoutExpired) as e:
+        raise RuntimeError("本地渲染调用失败：{}".format(e))
+    if p.returncode != 0 or (out_path and (
+            not os.path.isfile(out_path) or os.path.getsize(out_path) == 0)):
+        err = (p.stderr or p.stdout or "").strip()
+        raise RuntimeError("本地渲染失败：{}".format(err[-300:] or "未知错误"))
+    return out_path, "local-chrome"
 
 
 # -------------------------------------------------------------- 可读性体检
@@ -259,8 +408,11 @@ def probe_natural_size(src, toks, opts):
     """取图形原始版式尺寸 (w, h)，拿不到返回 None。
 
     remote 走 mermaid.ink 的 /svg 端点（只解析 viewBox，不栅格化，很便宜）；
-    mmdc 走一次本地 svg 渲染。这一步是可读性体检与自动换方向的前提 ——
-    没有它就只能等图发出去才发现在手机上读不出。
+    mmdc / 本地 Chrome 走一次本地 svg 渲染。这一步是可读性体检与自动换方向的
+    前提 —— 没有它就只能等图发出去才发现在手机上读不出。
+
+    本地通道优先：**体检量和最终出图必须是同一套字体**，否则宽度算出来是
+    按默认字体的、出图却换了字体，字号估算就漂了。
     """
     mmdc = opts.get("mmdc") or shutil.which("mmdc") or shutil.which("mmdc.cmd")
     if mmdc:
@@ -270,11 +422,23 @@ def probe_natural_size(src, toks, opts):
             conf = os.path.join(td, "mermaid-config.json")
             io.open(mmd, "w", encoding="utf-8").write(src)
             io.open(conf, "w", encoding="utf-8").write(
-                json.dumps(mermaid_config(toks), ensure_ascii=False))
+                json.dumps(mermaid_config(toks, opts.get("font_family")),
+                           ensure_ascii=False))
             try:
                 subprocess.run([mmdc, "-i", mmd, "-o", svg, "-c", conf],
                                capture_output=True, timeout=180)
             except (OSError, subprocess.TimeoutExpired):
+                return None
+            if not os.path.isfile(svg):
+                return None
+            return parse_viewbox(io.open(svg, encoding="utf-8", errors="replace").read())
+
+    if opts.get("local") and local_ready():
+        with tempfile.TemporaryDirectory(prefix="wmp-svg-") as td:
+            svg = os.path.join(td, "diagram.svg")
+            try:
+                render_local(src, None, toks, opts, opts["width"], svg_out=svg)
+            except RuntimeError:
                 return None
             if not os.path.isfile(svg):
                 return None
@@ -301,7 +465,17 @@ def render_one(src, idx, out_dir, toks, opts, width=None):
     out_path = os.path.join(out_dir, "mermaid-{}.png".format(idx))
     scale = int(opts["scale"])
     width = int(width or opts["width"])
-    cfg_json = json.dumps(mermaid_config(toks), ensure_ascii=False)
+    cfg_json = json.dumps(mermaid_config(toks, opts.get("font_family")),
+                          ensure_ascii=False)
+
+    # 本地 Chrome 通道：字体可控 + 内容不出本机。失败且开了远程就退回远程。
+    if opts.get("local") and local_ready():
+        try:
+            return render_local(src, out_path, toks, opts, width)
+        except RuntimeError as e:
+            if not opts.get("remote"):
+                raise
+            out("  [!] 本地渲染失败，退回 mermaid.ink：{}".format(e))
 
     mmdc = opts.get("mmdc") or shutil.which("mmdc") or shutil.which("mmdc.cmd")
     if mmdc:
@@ -374,7 +548,8 @@ def collect_blocks(text):
 def load_config_defaults(cfg_path):
     """从 config.json 读 mermaid / theme 段，作为命令行默认值。"""
     d = {"theme": None, "dir": "assets", "scale": 3, "width": CONTENT_W,
-         "remote": True, "font_px": FONT_PX}
+         "remote": True, "font_px": FONT_PX, "local": True,
+         "font_preset": fonts.DEFAULT_PRESET}
     if not cfg_path or not os.path.isfile(cfg_path):
         return d
     try:
@@ -383,7 +558,7 @@ def load_config_defaults(cfg_path):
         return d
     if cfg.get("theme"):
         d["theme"] = cfg["theme"]
-    for k in ("dir", "scale", "width", "remote", "mmdc"):
+    for k in ("dir", "scale", "width", "remote", "mmdc", "local", "font_preset"):
         if k in (cfg.get("mermaid") or {}):
             d[k] = cfg["mermaid"][k]
     return d
@@ -418,7 +593,14 @@ def main():
                     help="不自动换 flowchart 方向（默认发现横排太扁时改竖排）")
     ap.add_argument("--no-size-check", action="store_true",
                     help="跳过可读性体检（省一次请求，也就看不到「字太小」的提示）")
+    ap.add_argument("--font-preset", default=None,
+                    help="图内文字字体预设（system/wenkai/serif/sans，默认 {}）。"
+                         "非 system 时会自动走本地渲染 —— 在线通道改不了字形"
+                         .format(fonts.DEFAULT_PRESET))
+    ap.add_argument("--list-fonts", action="store_true", help="列出字体预设后退出")
     ap.add_argument("--mmdc", default=None, help="本地 mmdc 可执行文件路径")
+    ap.add_argument("--no-local", action="store_true",
+                    help="禁用本地 Chrome 渲染通道（退回 mermaid.ink）")
     ap.add_argument("--no-remote", action="store_true", help="禁用 mermaid.ink 在线渲染")
     ap.add_argument("--json", action="store_true", help="额外输出 manifest JSON")
     args = ap.parse_args()
@@ -432,8 +614,19 @@ def main():
             out("  {:<10} {:<22} {}".format(name, tid, primary))
         return 0
 
+    if args.list_fonts:
+        out("字体预设（可用标 OK）：")
+        for pid, spec in fonts.PRESETS.items():
+            f = fonts.preset_files(pid)
+            mark = "OK " if (f["title"] and f["body"]) else "-- "
+            out("  {}{:<8} {}".format(mark, pid, spec["label"]))
+            out("           title={}".format(os.path.basename(f["title"] or "（缺）")))
+            out("           body ={}".format(os.path.basename(f["body"] or "（缺）")))
+        out("\n字体查找目录：" + "、".join(fonts.font_dirs()))
+        return 0
+
     if not args.file:
-        ap.error("缺少输入文件（或用 --list-themes）")
+        ap.error("缺少输入文件（或用 --list-themes / --list-fonts）")
     if not os.path.isfile(args.file):
         die("输入文件不存在：{}".format(args.file))
 
@@ -451,6 +644,29 @@ def main():
         "target_pt": args.target_size or TARGET_PT,
     }
 
+    # ---- 字体：换字形必须本地渲染（在线通道看不到 @font-face 指向的本地文件）
+    preset = args.font_preset or d.get("font_preset") or fonts.DEFAULT_PRESET
+    if preset not in fonts.PRESETS:
+        die("未登记的字体预设：{}（可选：{}）".format(
+            preset, "/".join(fonts.PRESETS)))
+    local_on = False if args.no_local else bool(d.get("local", True))
+    if preset != "system" and not local_on:
+        out("[!] 字体预设 {} 依赖本地渲染通道，--no-local 已忽略".format(preset))
+        local_on = True
+    font_family, font_css = None, ""
+    if preset != "system":
+        if not fonts.available(preset):
+            out("[!] 字体预设 {} 的文件没配齐，退回 {}".format(
+                preset, fonts.DEFAULT_PRESET))
+            preset = fonts.DEFAULT_PRESET
+        else:
+            font_family = fonts.css_stack(preset, "body")
+            font_css = fonts.face_css(preset)
+    opts["local"] = local_on
+    opts["font_preset"] = preset
+    opts["font_family"] = font_family
+    opts["font_css"] = font_css
+
     text = io.open(args.file, encoding="utf-8").read()
     blocks = collect_blocks(text)
 
@@ -464,6 +680,12 @@ def main():
             first = (src.strip().splitlines() or [""])[0][:60]
             out("  [{}] {}".format(i, first))
         return 0
+
+    if opts["local"] and local_ready():
+        out("渲染通道：本地 Chrome（字体预设 {}，图内字形可控）".format(preset))
+    elif opts["local"]:
+        out("[!] 本地渲染不可用（{}），改走 mermaid.ink —— 图内字形由对方服务器"
+            "决定，--font-preset 不生效".format(_LOCAL["why"]))
 
     base = os.path.dirname(os.path.abspath(args.file))
     out_dir = out_dir_rel if os.path.isabs(out_dir_rel) \

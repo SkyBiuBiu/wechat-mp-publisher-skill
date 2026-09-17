@@ -230,9 +230,12 @@ python scripts/render_mermaid.py article.md --theme moyu-green
 
 - 产出 `article.mermaid.md`（工作副本，围栏已换成 `![](assets/mermaid-N.png)`）和
   `assets/mermaid-N.png`（默认 `scale=3`，手机上看不糊）。
-- 本地装了 mmdc（`npm i -g @mermaid-js/mermaid-cli`）走本地渲染，不联网；没装则走
-  mermaid.ink 在线渲染（图表内容会发给该第三方服务，涉密图表加 `--no-remote` 并装 mmdc）。
+- **渲染通道按这个顺序自动选**：① 本地 Chrome（node + playwright-core，字体可控且内容不出本机）
+  → ② 本地 mmdc（`npm i -g @mermaid-js/mermaid-cli`）→ ③ mermaid.ink 在线渲染（图表内容会发给
+  该第三方服务，涉密图表加 `--no-remote`）。走到哪一条、为什么没走本地，输出里都会写明。
 - 图表的配色自动取所选主题「设计变量速查表」的主色。
+- **图内字体**：`--font-preset wenkai|serif|sans|rounded`（默认 `system`）。换字必须走本地通道 ——
+  mermaid.ink 的服务器上没有你的字体，`font-family` 写什么都没用。
 - **渲染完一定要看一眼 PNG**：本地编辑器若往 HTML 注入 `data-page-node-id` 这类记账属性，
   会把 mermaid 源码里的 `<br/>` 污染成 `<br data-page-node-id="…">`，它认不出来就会当字面文本
   画在图上。这类污染**不报错、只画错**。
@@ -353,6 +356,48 @@ python scripts/make_assets.py -c work/config.json -o work/assets \
 用它做环、竖条、品牌方块与分隔线——否则封面会整张没有颜色（橄榄手记的橙 `#ed7b2f`
 与石墨极简的橙 `#F97316` 就是这么上场的）。没登记点睛色的主题回退主色，观感只是"更足"。
 未登记皮肤的新主题会按主色彩度自动推导（近无彩则自动用点睛色）。
+
+#### 换字体（封面 + 流程图）
+
+字体预设由 `scripts/fonts.py` 统一管，封面（Pillow 按文件加载）和流程图（浏览器按字体族名加载）
+**从同一份清单取** —— 只换一处会得到"封面换了字、图没换"的半吊子状态。
+
+| 预设 | 字体 | 气质 |
+|---|---|---|
+| `system` | 系统黑体（微软雅黑） | 默认，零依赖 |
+| `wenkai` | 霞鹜文楷 LXGW WenKai | 楷体骨架，温润、辨识度高 |
+| `serif` | 思源宋体（标题）+ 思源黑体（正文） | 衬线，正式厚重 |
+| `sans` | 思源黑体 Noto Sans SC | 现代黑体，小字号最清晰 |
+| `rounded` | MiSans Demibold（标题）+ MiSans Regular（正文） | 圆润科技风，笔画端头圆滑 |
+
+**字体文件不进分发包**（一套中文 17~26MB）。放到这几个位置之一即可，按顺序查找：
+
+```
+1. 环境变量 WMP_FONT_DIR 指定的目录
+2. <skill>/assets/fonts/
+3. ~/.workbuddy/fonts/          ← 推荐，多项目共用
+4. C:\Windows\Fonts             ← 系统字体兜底
+```
+
+```bash
+python scripts/fonts.py                      # 看每套预设解析到哪个文件、查了哪些目录
+python scripts/make_assets.py -c work/config.json -o work/assets --font-preset wenkai
+python scripts/render_mermaid.py article.md --theme moyu-green --font-preset wenkai
+```
+
+也可以在 `config.json` 里定一次，省得每次写参数：封面读 `font.preset`，流程图读
+`mermaid.font_preset`（两处建议填一样的值）。
+
+**挑字体先看对比图**，别凭文字描述选：
+
+```bash
+python scripts/font_samples.py --src work --out work/showcase/_fonts
+#   产出 work/showcase/_fonts/font-samples.png（同一版封面 + 同一张流程图 × 各预设）
+#   只看某几套：--presets system,wenkai
+```
+
+字体取不到时**不会崩、也不会静默变**：退回系统字体并在 stderr 说明缺的是哪一个角色
+（标题 / 正文），排查时先看这行提示。
 
 #### 一次看全六套封面
 

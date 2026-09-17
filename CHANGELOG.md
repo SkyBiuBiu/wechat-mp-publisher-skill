@@ -7,6 +7,52 @@
 
 版本号同步保存在根目录 `VERSION` 文件，打 tag 时用 `v<版本号>`（例：`v0.1.0`）。
 
+## [0.9.0] - 2026-09-17
+
+封面与流程图可以换字体了，并且**换的是同一套字体**；流程图多了一条**本地渲染**通道 ——
+图内字形终于可控，图表内容也不再离开本机。
+
+起因很直接：字一直是"系统装了什么就用什么"。封面走 Pillow（认字体文件）、流程图走
+mermaid.ink（字体在**对方服务器**上找）—— 两边都不认"预设"这个概念，`fontFamily` 写了也白写，
+于是"换个好看的字体"这件事在两条链路上都做不到。
+
+### Added
+
+- **`scripts/fonts.py`：字体预设的唯一入口。** 四个预设 —— `system`（系统黑体，默认）/
+  `wenkai`（霞鹜文楷）/ `serif`（思源宋体标题 + 思源黑体正文）/ `sans`（思源黑体）。
+  封面与流程图**共用这一份清单**：Pillow 要文件路径、浏览器要族名 + `@font-face`，
+  两边各写一份必然漂成"封面换了字、图没换"。查找顺序 `WMP_FONT_DIR` →
+  `<skill>/assets/fonts/` → `~/.workbuddy/fonts/` → 系统字体，缺哪个角色退回哪个角色
+  并在 stderr 说明（**不静默变**）。字体文件不入分发包：一套中文 17~26MB，
+  `build_zip.py` 已排除 `assets/fonts/` 与 `assets/vendor/`。
+- **`scripts/mermaid_local.js`：流程图的本地渲染通道**（playwright 驱动本机 Chrome）。
+  把 mermaid.js 与 `@font-face` 一起喂进浏览器，图内字形可控；顺带两个好处：图表内容不再
+  发给第三方，体检用的 SVG 与出图用**同一份渲染**（原先体检走 mermaid.ink，字号估算与
+  实际出图可能不是一回事）。找不到 mermaid.js 时按需下载一份到 `assets/vendor/` 缓存。
+  通道顺序变为 **本地 Chrome → mmdc → mermaid.ink**，走到哪条、为什么没走本地都会打印。
+- **`scripts/font_samples.py`：选字对比样张。** 同一版封面 + 同一张流程图 × 各预设，
+  拼成一张 `font-samples.png`。字体好不好看文字描述不出来，只能看。
+- `render_mermaid.py` 新增 `--font-preset` / `--list-fonts` / `--no-local`；
+  非 `system` 预设会**强制**走本地通道（在线通道看不到 `@font-face`）。
+- `make_assets.py` 新增 `--font-preset` / `--list-fonts`，并支持 `config.json` 的 `font.preset`。
+- `config.json` 新增 `font.preset`、`mermaid.local`、`mermaid.font_preset`。
+- `validate_skill.py` 第 10 项：字体预设接线（两处消费方是否都接了 `fonts.py`、
+  本地通道脚本与 `@font-face` 是否在位、族名是否只从 `fonts.FAMILY_TPL` 生成、
+  本机可用预设等）。
+
+### Fixed
+
+- **可变字体默认实例是最细档**：思源宋体默认 `wght=200`（ExtraLight）、思源黑体默认
+  `wght=100`（Thin）—— 不显式设字重轴，封面标题会是一副"细细的、怪怪的"样子，
+  还容易被误判成"字体没换成功"。
+- **Pillow 的轴名是 bytes**（`b'Weight'`），`str()` 之后是 `"b'weight'"`，
+  与 `"weight"` 匹配不上 → 字重设置静默失效。已按字节解码后比对。
+
+### Notes
+
+- 封面观感取决于机器上有没有对应字体：没有就退回系统黑体（行为与 0.8.0 一致），
+  所以这个版本对没装字体的环境是**无感升级**。
+
 ## [0.8.0] - 2026-09-17
 
 封面从"配色跟着主题走"升级为**一套显式版式规格 + 可辨的主题质感皮肤**。

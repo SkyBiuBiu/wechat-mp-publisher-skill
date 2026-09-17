@@ -123,8 +123,10 @@ agent_created: true
 python <skill>/scripts/render_mermaid.py article.md --theme moyu-green
 #   → 产出 article.mermaid.md（围栏已换成 ![](assets/mermaid-N.png)）
 #   → 产出 assets/mermaid-1.png、mermaid-2.png …
-#   本地装了 mmdc 会优先用；没有则走 mermaid.ink（涉密图表加 --no-remote 并装 mmdc）
+#   通道自动选：本地 Chrome（默认，字体可控且内容不出本机）→ 本地 mmdc → mermaid.ink
+#   想换图内字体：--font-preset wenkai（非 system 时强制走本地通道）
 python <skill>/scripts/render_mermaid.py --list-themes      # 查主题标识
+python <skill>/scripts/render_mermaid.py --list-fonts       # 看字体预设解析到哪些文件
 ```
 
 **"图看不清"的根因是原始版式宽度，不是位图像素不够。** mermaid.ink 会按请求宽度缩放，
@@ -143,6 +145,11 @@ python <skill>/scripts/render_mermaid.py --list-themes      # 查主题标识
   免得满宽拉出一屏 40px 巨字 + 两张屏高；
 - 出图**强制不透明底**（`bgColor=FFFFFF`）。mermaid.ink 默认返回半透明 PNG，
   而微信点开大图是**黑底查看器**，深色文字压在黑底上等于没画。
+
+**图内字体**：默认 `system`（系统黑体）。想让流程图用别的字形，装好字体文件后加
+`--font-preset wenkai|serif|sans|rounded`（或在 `config.json` 的 `mermaid.font_preset` 里定一次）。
+**换字必须走本地通道** —— mermaid.ink 的服务器上没有你的字体，写什么 `font-family` 都白搭。
+本地通道 = node + playwright-core + 本机 Chrome（缺哪样都会在输出里说明原因并自动退回在线通道）。
 
 **"正文宽度"取手机值 328px，不是桌面网页的 677px。** 328 = 360dp 机型 360 − 两侧留白
 16×2（见 `theme_vars.MOBILE_CONTENT_W`，插图与代码块共用这一个数）。早期版本按 677 算，
@@ -293,6 +300,21 @@ python <skill>/scripts/make_assets.py -c wechat-publish/config.json -o wechat-pu
 不要去改主题库色值**：摸鱼绿与摸鱼票据风主色同为 `#059669`、石墨极简与留白禅意都偏无彩，
 改色值会牵连正文排版。
 
+**字体**：默认跟随系统（微软雅黑）。换字体加 `--font-preset`，或在 `config.json` 的
+`font.preset` 里定一次：`wenkai`（霞鹜文楷，楷体）/ `serif`（思源宋体标题 + 思源黑体正文）/
+`sans`（思源黑体）/ `rounded`（MiSans，圆润科技风）。**封面与流程图共用 `scripts/fonts.py`
+这一份预设清单**，改就两处一起改 ——
+只换一处会得到"封面换了字、图没换"的半吊子状态。字体文件不进分发包：放到
+`~/.workbuddy/fonts/`（或 `<skill>/assets/fonts/`、`WMP_FONT_DIR`），缺了自动退回系统字体
+并在 stderr 说明，不会崩也不会悄悄变。
+
+挑字体先出对比图（同一版封面 + 同一张流程图 × 各预设，一眼看完）：
+
+```bash
+python <skill>/scripts/font_samples.py --src wechat-publish --out wechat-publish/showcase/_fonts
+#   产出 font-samples.png；想只看某几套：--presets system,wenkai
+```
+
 封面右侧那块极淡主色默认空着。讲**循环 / 流程 / 分步**的文章用 `--motif ring` 在那里点一个环形意象
 （N 个节点 + 顺时针箭头 + 圆心文字），`--motif-nodes` 填文章里的环节数：
 
@@ -371,7 +393,10 @@ python <skill>/scripts/publish.py draft -c wechat-publish/config.json
 | `make_assets.py` | 生成封面（需 pillow）；文案读 `config.cover`，`--motif ring` 加环形意象 |
 | `cover_spec.py` | 封面几何规格 + 主题皮肤（单一来源；直接跑它可自检规格） |
 | `cover_wall.py` | 出「同一篇文章 × 全部主题」的封面墙（换主题前预览 / 新主题验收） |
-| `validate_skill.py` | 仓库自检（改完 skill 必跑，含封面规格与配色护栏） |
+| `fonts.py` | 字体预设的唯一入口（封面 Pillow 与流程图浏览器共用一份）；直接跑可看解析结果 |
+| `font_samples.py --src X --out Y` | 字体对比样张（封面 + 流程图 × 各预设），选字用 |
+| `mermaid_local.js` | 流程图的本地渲染通道（playwright + 本机 Chrome；字体可控、内容不出本机） |
+| `validate_skill.py` | 仓库自检（改完 skill 必跑，含封面规格与配色、字体预设接线护栏） |
 
 通用参数：`-c 路径` 指定配置（默认按「当前目录/config.json → 脚本目录/config.json」查找）、`-f` 强制刷新 token、`-y` 跳过发布确认。
 凭证也可用环境变量：`WECHAT_MP_APPID` / `WECHAT_MP_APPSECRET`。

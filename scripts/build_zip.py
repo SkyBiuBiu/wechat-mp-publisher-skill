@@ -39,6 +39,8 @@ EXCLUDE_EXTS = {".pyc", ".pyo", ".zip", ".swp", ".log"}
 EXCLUDE_REL_PREFIXES = (
     "docs/images/",   # README 的主题样例配图
     "tools/",         # 开发辅助脚本（生成上面的配图，需本机 Chrome）
+    "assets/fonts/",  # 字体文件（一套中文 17~26MB；用户放 ~/.workbuddy/fonts/ 即可）
+    "assets/vendor/", # mermaid.js 本地缓存（运行时按需下载，别塞进包）
 )
 
 

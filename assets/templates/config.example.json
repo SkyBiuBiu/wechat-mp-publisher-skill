@@ -13,12 +13,19 @@
   "_theme": "排版用的主题标识。取值见 references/theme-index.md，可选：moyu-green(摸鱼绿) / red-white(红白雪) / graphite-minimal(石墨极简) / zen-whitespace(留白禅意) / moyu-ticket(摸鱼票据) / olive-journal(橄榄手记)。只影响排版气质，不影响文章内容与结构",
   "theme": "moyu-green",
 
-  "_mermaid": "mermaid 图渲染为 PNG（公众号剥 JS 与 SVG 文字）。remote=true 且本地没装 mmdc 时走 mermaid.ink 在线渲染，图表内容会发给该第三方服务；涉密内容请本地安装 mmdc（npm i -g @mermaid-js/mermaid-cli）并设 remote=false",
+  "_mermaid": "mermaid 图渲染为 PNG（公众号剥 JS 与 SVG 文字）。local=true（默认）时用本机 Chrome 渲染：图内字形可控、内容不出本机；没装 node+playwright-core 时自动退回。remote=true 是兜底通道（mermaid.ink 在线渲染，图表内容会发给该第三方服务），local 不可用时才会用到；涉密内容也可本地装 mmdc（npm i -g @mermaid-js/mermaid-cli）",
   "mermaid": {
+    "local": true,
     "remote": true,
+    "font_preset": "system",
     "scale": 3,
     "width": 1200,
     "dir": "assets"
+  },
+
+  "_font": "字体预设：system(系统黑体) / wenkai(霞鹜文楷) / serif(思源宋体+思源黑体) / sans(思源黑体)。字体文件不进分发包，放到 ~/.workbuddy/fonts/ 或设 WMP_FONT_DIR；缺了自动退回系统字体并在 stderr 说明。封面与流程图共用这一套名字，建议两处一致",
+  "font": {
+    "preset": "system"
   },
 
   "article": {

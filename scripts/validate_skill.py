@@ -13,7 +13,8 @@
   7. 主题注册表（references/theme-index.md）与主题组件库文件是否一一对应
   8. 组件库源头无反模式（复用 component_lint.py —— 可验证循环的第一关）
   9. 封面规格与配色（几何单一来源、六主题角色无静默回退、点睛色是否上场）
-  10. 上游（gzh-design-skill, AGPL-3.0）署名与授权文件是否在位
+  10. 字体预设（封面与流程图是否共用 fonts.py、本地渲染通道是否在位）
+  11. 上游（gzh-design-skill, AGPL-3.0）署名与授权文件是否在位
 
 退出码：0 = 全部通过，1 = 存在 FAIL。
 
@@ -454,6 +455,67 @@ def check_cover_spec():
 
 
 # ---- 10. 上游署名 -------------------------------------------------------------
+# ---- 10. 字体预设（封面 / 流程图共用一份清单） -------------------------------
+def check_fonts():
+    """字体是"静默变丑"的重灾区，判定结构而不是观感。
+
+    为什么需要它：
+      · 封面走 Pillow（认**文件路径**），流程图走浏览器（认**字体族名** +
+        @font-face）—— 两边各写一份预设清单，就会出现"封面换了字、图没换"，
+        而且两边都正常运行、都不报错；
+      · 字体文件不是必装项，缺了要能退回系统字体；但"退回了"这件事必须有痕迹
+        （见 fonts.pick 的 stderr 提示），不能悄悄变。
+    这里只判定接线在位，不判定字体文件是否存在 —— 那取决于本机装了什么。
+    """
+    try:
+        import fonts
+    except ImportError as e:
+        fail("字体预设", "无法加载 scripts/fonts.py：{}".format(e))
+        return
+
+    if len(fonts.PRESETS) < 2:
+        fail("字体预设", "PRESETS 少于 2 套，'换字体'等于没得选")
+    else:
+        ok("字体预设", "{} 套可选：{}".format(
+            len(fonts.PRESETS), " / ".join(fonts.PRESETS)))
+
+    for name in ("make_assets.py", "render_mermaid.py"):
+        text = read(os.path.join(HERE, name))
+        if "import fonts" not in text:
+            fail("字体接线", "{} 没接 fonts.py —— 会出现封面与流程图各写一份字体".format(name))
+        elif "--font-preset" not in text:
+            fail("字体接线", "{} 没有 --font-preset 开关".format(name))
+
+    rm = read(os.path.join(HERE, "render_mermaid.py"))
+    js = os.path.join(HERE, "mermaid_local.js")
+    if not os.path.isfile(js):
+        fail("本地渲染通道", "scripts/mermaid_local.js 不在（流程图就只能走 mermaid.ink，"
+                              "字形由对方服务器决定）")
+    elif "mermaid_local.js" not in rm:
+        fail("本地渲染通道", "render_mermaid.py 没引用 mermaid_local.js")
+    elif "face_css" not in rm:
+        fail("本地渲染通道", "本地渲染没把 @font-face 传下去，换了字体也不会生效")
+    else:
+        ok("本地渲染通道", "流程图可走本机 Chrome 渲染（字体可控、内容不出本机）")
+
+    # 字体族名只许从 fonts.FAMILY_TPL 拼出来，别在渲染脚本里另写字面量
+    if re.search(r"WMP-[a-z]", rm):
+        fail("字体族名", "render_mermaid.py 里出现字面量 WMP- 族名，"
+                          "应从 fonts.families() 取，否则改名不同步")
+    else:
+        ok("字体族名", "族名统一由 fonts.FAMILY_TPL 生成（改名只改一处）")
+
+    if not os.path.isfile(os.path.join(HERE, "font_samples.py")):
+        warn("选字样张", "scripts/font_samples.py 不在，没法一键出字体对比图")
+
+    have = [p for p in fonts.PRESETS if fonts.available(p)]
+    if not have:
+        warn("字体文件", "本机一套预设的字体都没落到查找目录里（跑 scripts/fonts.py 看路径），"
+                          "出图会全部退回系统字体")
+    else:
+        ok("字体文件", "本机可用预设：{}".format(" / ".join(have)))
+
+
 def check_upstream():
     lic = os.path.join(ROOT, "LICENSE-gzh-design")
     if not os.path.isfile(lic):
@@ -483,7 +545,7 @@ def main():
     for fn in (check_required, check_frontmatter, check_version,
                check_python_syntax, check_secrets, check_references,
                check_themes, check_component_lint, check_cover_spec,
-               check_upstream):
+               check_fonts, check_upstream):
         try:
             fn()
         except Exception as e:                       # noqa: BLE001

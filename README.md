@@ -62,11 +62,12 @@
 ### 发布侧
 
 - **正文图片自动换链**：正文写 `<img src="assets/xx.png">` 本地相对路径，脚本先传微信图床再替换 `src`。外链图会被微信静默过滤，别用。
-- **mermaid 高清渲染**：`render_mermaid.py` 把 ```mermaid 围栏渲染成 PNG（本地 mmdc 优先，mermaid.ink 兜底），默认 `scale=3`，手机上看不糊。它还量出图形的**原始版式宽度**，推算这张图发出去在正文里究竟是多大的字：`LR` 长链在手机上只剩 3.8px 时会**自动换方向**（`3.8px → 12.4px`），窄图则**收窄显示宽度**免得拉出一屏巨字；出图一律**不透明底**（mermaid.ink 默认半透明，而微信点开大图是黑底查看器，深色文字会糊掉）。
+- **mermaid 高清渲染**：`render_mermaid.py` 把 ```mermaid 围栏渲染成 PNG（**本地 Chrome 优先，mermaid.ink 兜底**），默认 `scale=3`，手机上看不糊。它还量出图形的**原始版式宽度**，推算这张图发出去在正文里究竟是多大的字：`LR` 长链在手机上只剩 3.8px 时会**自动换方向**（`3.8px → 12.4px`），窄图则**收窄显示宽度**免得拉出一屏巨字；出图一律**不透明底**（mermaid.ink 默认半透明，而微信点开大图是黑底查看器，深色文字会糊掉）。
 - **代码按语言着色**：`highlight_code.py` 把代码围栏转成带 token 颜色的代码块组件，配色**从主题库推导**（以主色色相为起点铺色环：关键词 `+0°`、函数/数字/字符串/内置/类型依次 `+35°/ +70°/ +140°/ +195°/ +262°`，六个色相同处一个明度带 `L≈0.68~0.78`、一个饱和度带 `S≈0.45~0.62`；关键词加粗，运算符标点不着色）。6 套内置主题与自定义主题都自动适配，不必逐主题维护配色表。顺带把**缩进与对齐**（`&nbsp;`）和**长行横滑**（`overflow-x:auto` + 逐行 `white-space:nowrap`）一起做对——这两件手写必错。见 [`references/common-components.md`](references/common-components.md) 的 1a+/1b+ 节。
 - **发布前体检**：`preflight.py` 在本地把接口侧会翻车的地方拦掉——标题 32 字、作者 16 字、摘要 120 字、正文 1MB、图片体积格式、外链图、残留围栏与 mermaid 源码。分 P0 阻断 / P1 警告 / P2 建议三级，每条都给处理办法。
   （「正文 2 万字符」是文档口径，**2026-09-17 实测未强制**：4.5 万字符被接受且完整落库，所以只提示不阻断。）
-- **零第三方依赖**：全部脚本只用 Python 标准库（`make_assets.py` 需 pillow），Windows / Linux 通用。
+- **零第三方依赖**：全部脚本只用 Python 标准库（`make_assets.py` 需 pillow），Windows / Linux 通用。**可选增强**：流程图想换字体或不想把图表内容发给第三方时，装 node + playwright-core（用本机 Chrome 渲染），脚本自动检测，缺了照常走 mermaid.ink。
+- **字体可选、封面与配图同源**：`scripts/fonts.py` 是字体预设的唯一入口（`system` / `wenkai` 霞鹜文楷 / `serif` 思源宋体 / `sans` 思源黑体 / `rounded` MiSans 圆润科技风）。封面走 Pillow（认文件）、流程图走浏览器（认字体族名）——两边都从这一份清单取，不会出现"封面换了字、图没换"。字体文件不进分发包：放到 `~/.workbuddy/fonts/`（或 `WMP_FONT_DIR`）即可，缺了自动退回系统字体并在 stderr 说明。挑字体用 `python scripts/font_samples.py --src <工作目录> --out <输出目录>`，出一张「同一版封面 + 同一张流程图 × 各预设」的对比图。
 - **错误码翻成人话**：微信的 `errcode` 直接翻译成处置建议，`40164` 还会自动从报错里抠出被拒的 IP。
 - **白名单等待器**：`watch_ip.py` 挂着轮询，白名单一生效自动接着建草稿，不用反复手点。
 - **默认只建草稿**：正式发布需要显式确认；删除草稿必须给 `media_id`，防手滑。
@@ -332,7 +333,10 @@ python scripts/publish.py <子命令> [参数]
 | `scripts/make_assets.py` | 生成封面（900×383），需 `pillow`；配色跟 `config.json` 的 `theme` 走，文案读 `config.cover`（`--brand/--title/--subtitle/--date/--motif*` 可覆盖），`--dark` 回内置深色版式；`--motif ring` 在右侧空处点一个环形循环意象（`--motif-nodes` 定节点数），`--only cover` 只出封面 |
 | `scripts/cover_spec.py` | **封面的几何规格**（`SPEC`）与**主题质感皮肤**（`THEME_SKINS`）的单一来源：底色、竖条、描边、圆角、底纹、字型。`make_cover` 只按规格画，不写字面坐标；直接跑它可自检规格 |
 | `scripts/cover_wall.py` | 出「同一篇文章 × 全部主题」的**封面墙**（每格标注主题/主色/点睛色/皮肤）：换主题前肉眼看一眼封面，也是新增主题的验收口 |
-| `scripts/validate_skill.py` | 仓库自检：结构 / frontmatter / 版本 / 语法 / 密钥 / 引用 / 主题注册表 / 组件库源头关 / 封面规格与配色 |
+| `scripts/fonts.py` | **字体预设的唯一入口**（封面 Pillow 与流程图浏览器共用一份）：`system` / `wenkai` / `serif` / `sans` / `rounded`；直接跑它可看每套预设解析到哪个字体文件、查找目录有哪些。字体文件放 `~/.workbuddy/fonts/`、`<skill>/assets/fonts/` 或 `WMP_FONT_DIR` |
+| `scripts/mermaid_local.js` | 流程图的**本地渲染通道**（playwright 驱动本机 Chrome）：mermaid.js + `@font-face` 一起喂进浏览器，图内字形可控、图表内容不出本机 |
+| `scripts/font_samples.py` | **选字样张**：同一版封面 + 同一张流程图 × 各字体预设，拼成一张对比图（`--presets system,wenkai`） |
+| `scripts/validate_skill.py` | 仓库自检：结构 / frontmatter / 版本 / 语法 / 密钥 / 引用 / 主题注册表 / 组件库源头关 / 封面规格与配色 / 字体预设接线 |
 | `scripts/build_zip.py` | 打分发 zip 到 `dist/`，自动排除密钥与本机状态 |
 
 ## 配置项
@@ -349,6 +353,9 @@ python scripts/publish.py <子命令> [参数]
 | `mermaid.scale` | | 渲染倍率，默认 `3`（输出像素 ≈ scale × 该图的显示宽度，越高越清晰） |
 | `mermaid.width` | | **兜底**显示宽度，默认 `328`（手机正文内容区宽度，见 `theme_vars.MOBILE_CONTENT_W`）。只在量不到图形原始宽度时用得上 —— 正常每张图的宽度由脚本按"让字号落在正文大小"逐张算 |
 | `mermaid.dir` | | 渲染产物目录，默认 `assets` |
+| `mermaid.local` | | 用本机 Chrome 渲染流程图（默认 `true`；没装 node+playwright 时自动退回在线通道）。换字体必须走本地通道 |
+| `mermaid.font_preset` | | 图内文字字体预设，默认 `system`（也可用命令行 `--font-preset`） |
+| `font.preset` | | 封面字体预设，默认 `system`。与 `mermaid.font_preset` 用同一套名字，建议两处填一样 |
 | `article.title` | ✅ | 标题，上限 32 字 |
 | `article.digest` | | 摘要，上限 120 字；留空自动抓正文前 54 字 |
 | `article.content_file` | ✅ | 正文 HTML，路径相对配置文件所在目录 |
@@ -381,6 +388,9 @@ wechat-mp-publisher-skill/
 │   ├── make_assets.py              # 封面生成（需 pillow）
 │   ├── cover_spec.py               # 封面几何规格 + 主题质感皮肤（单一来源）
 │   ├── cover_wall.py               # 全部主题的封面墙（换主题前预览 / 新主题验收）
+│   ├── fonts.py                    # 字体预设的唯一入口（封面/流程图共用一份清单）
+│   ├── mermaid_local.js            # 流程图本地渲染通道（playwright + 本机 Chrome）
+│   ├── font_samples.py             # 字体对比样张（封面 + 流程图 × 各预设）
 │   ├── build_theme_showcase.py     # 同一篇成稿 × 全部主题，出六版成稿 + 对比页（可推草稿）
 │   ├── watch_ip.py                 # 白名单生效轮询
 │   ├── validate_gzh_html.py        # 产物关（上游）
@@ -488,7 +498,7 @@ git push origin main
 
 本仓库分两部分：
 
-- **本仓库自有部分**（发布链路：`scripts/publish.py`、`preflight.py`、`render_mermaid.py`、`highlight_code.py`、`theme_vars.py`、`make_assets.py`、`cover_spec.py`、`cover_wall.py`、`build_theme_showcase.py`、`watch_ip.py`、`validate_skill.py`、`build_zip.py`、`tools/`、`docs/`、`references/wechat-api-reference.md`）—— [MIT](LICENSE) © 2026 Sky (SkyBiuBiu)
+- **本仓库自有部分**（发布链路：`scripts/publish.py`、`preflight.py`、`render_mermaid.py`、`highlight_code.py`、`theme_vars.py`、`make_assets.py`、`cover_spec.py`、`cover_wall.py`、`fonts.py`、`mermaid_local.js`、`font_samples.py`、`build_theme_showcase.py`、`watch_ip.py`、`validate_skill.py`、`build_zip.py`、`tools/`、`docs/`、`references/wechat-api-reference.md`）—— [MIT](LICENSE) © 2026 Sky (SkyBiuBiu)
 - **排版链路**（`references/theme-*.md`、`common-components.md`、`theme-generator.md`、`format-normalize.md`、`eval-cases.md`、`theme-index.md`、`assets/preview-template.html`、`assets/sample-article.md`、`scripts/validate_gzh_html.py`、`component_lint.py`、`wrap_preview.py`、`extract_docx.py`）—— 来自 [**isjiamu/gzh-design-skill**](https://github.com/isjiamu/gzh-design-skill)，原创 **甲木 × 摸鱼小李**，授权 **AGPL-3.0**，原文见 [`LICENSE-gzh-design`](LICENSE-gzh-design)。
 
 > 排版链路的署名与授权声明**不得删除**；这部分内容的修改版、Fork、二次分发须以 AGPL-3.0（或兼容协议）公开发布，即使只作为网络服务提供也要开源。

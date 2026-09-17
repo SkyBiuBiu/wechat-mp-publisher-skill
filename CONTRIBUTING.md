@@ -15,6 +15,7 @@
 | `references/theme-index.md` | **主题信息的单一来源**。新增主题必须在此登记，否则 `validate_skill.py` 判 FAIL |
 | `references/theme-{标识}.md` | 单套主题组件库，五章节齐全（变量表 / 组件 / 骨架 / 配方表 / 映射表） |
 | `assets/templates/` | 模板与配置样例。`config.example.json` 只允许占位值 |
+| `assets/fonts/` / `assets/vendor/` | **可选资源，不进分发包**（`EXCLUDE_REL_PREFIXES` 排除）：本地字体文件、mermaid.js 缓存。运行时按需由 `fonts.py` / `render_mermaid.py` 查找或下载，缺了自动降级 |
 | `docs/` | 面向人的文档，GitHub 展示用，AI 不读 |
 | `.github/` | CI 与协作模板 |
 
@@ -36,6 +37,14 @@
    `watch_ip.py` / `validate_skill.py` / `build_zip.py`）。
    只有 `make_assets.py` 允许依赖 `pillow`，且必须能优雅降级/给出安装提示。
    理由：技能会被直接投放到用户机器上跑，装依赖是最大的摩擦来源。
+   **"可选增强"依赖允许存在，但必须能自动降级并把原因说出来**：本地渲染通道
+   （`scripts/mermaid_local.js`，需 node + playwright-core + 本机 Chrome）装不齐时，
+   `render_mermaid.py` 要退回 mermaid.ink 并打印为什么没走本地；字体（`scripts/fonts.py`）
+   取不到要退回系统字体并说明缺的是哪个角色。**不许把"没装"变成"跑不起来"**，
+   也不许静默换掉用户看到的东西。
+   **资源类文件不进分发包**：字体（一套中文 17~26MB）与 mermaid.js 缓存分别放
+   `assets/fonts/`、`assets/vendor/`，`build_zip.py` 已排除这两处；模块里取不到的路径要
+   给环境变量逃生口（`WMP_FONT_DIR` / `WMP_MERMAID_JS` / `WMP_NODE` / `WMP_CHROME`）。
 3. **跨平台**。Windows 与 Linux 都要能跑：
    - 路径统一用 `os.path.join` / `pathlib`，别硬编码 `/` 或 `\`
    - 控制台输出避免 ANSI 颜色（Windows 老终端不认）；需要输出中文/特殊符号时

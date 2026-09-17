@@ -40,6 +40,7 @@ from PIL import Image, ImageDraw, ImageFont
 
 import theme_vars          # 同目录；主题变量表的唯一解析入口
 import cover_spec          # 同目录；封面几何规格与主题皮肤的唯一来源
+import fonts               # 同目录；字体预设（封面与流程图共用一份，见 fonts.py）
 
 # 2x 高清倍率：全部坐标与字号按此缩放（设计稿以 1x 为单位）
 S = 2
@@ -68,15 +69,26 @@ def load_theme(theme_id):
 
 _SERIF_MISSING = []
 
+# 全局字体预设（命令行 --font-preset / config.font.preset 决定）。
+# "system" = 老行为：按下面的候选表挑系统字体；其余预设统一走 fonts.py，
+# 保证封面和流程图用的是同一套字。
+FONT_PRESET = "system"
+
 
 def font(size, bold=False, serif=False):
     """挑一个可用的中文字体，按优先级回退。
 
-    `serif=True` 给"禅意"类主题用衬线标题（皮肤参数 `serif`）。衬线字体比黑体
-    难找，取不到时**退回黑体并在 stderr 说一句** —— 静默退化会让"禅意风"这个
-    皮肤偷偷失效，而那正是它和石墨极简区分开的主要手段之一。
+    两种模式：
+    - `FONT_PRESET != "system"`：走 fonts.py 的预设（霞鹜文楷 / 思源宋体 / 思源黑体），
+      标题取 title 角色、其余取 body 角色。
+    - `system`（默认）：老候选表。`serif=True` 给"禅意"类主题用衬线标题（皮肤参数
+      `serif`）。衬线字体比黑体难找，取不到时**退回黑体并在 stderr 说一句** ——
+      静默退化会让"禅意风"这个皮肤偷偷失效，而那正是它和石墨极简区分开的主要手段。
     """
     size = int(size * S)
+    if FONT_PRESET and FONT_PRESET != "system":
+        return fonts.load(FONT_PRESET, "title" if bold else "body", size,
+                          weight=700 if bold else 400, quiet=True)
     candidates = []
     if serif:
         candidates += [r"C:\Windows\Fonts\simsun.ttc", r"C:\Windows\Fonts\msyh.ttc",
@@ -442,6 +454,7 @@ def resolve_cover_texts(cfg, args):
 
 
 def main():
+    global FONT_PRESET
     p = argparse.ArgumentParser(description="生成公众号封面与正文插图（需 pillow）")
     p.add_argument("-o", "--out", default=os.path.join(os.getcwd(), "assets"),
                    help="输出目录，默认 当前目录/assets")
@@ -468,7 +481,21 @@ def main():
                    help="ring 圆心副文字（小字），如 \"7 STEPS\"，留空不画")
     p.add_argument("--only", choices=["all", "cover", "diagram"], default="all",
                    help="只生成其中一张；默认 all（两张都出）")
+    p.add_argument("--font-preset", default=None,
+                   help="字体预设：{}（默认取 config 的 font.preset，再退回 system）"
+                        .format("/".join(fonts.PRESETS)))
+    p.add_argument("--list-fonts", action="store_true", help="列出字体预设后退出")
     args = p.parse_args()
+
+    if args.list_fonts:
+        for pid, spec in fonts.PRESETS.items():
+            f = fonts.preset_files(pid)
+            mark = "OK " if (f["title"] and f["body"]) else "-- "
+            print("{}{:<8} {}   标题={}  正文={}".format(
+                mark, pid, spec["label"], os.path.basename(f["title"] or "缺"),
+                os.path.basename(f["body"] or "缺")))
+        print("查找目录：" + "、".join(fonts.font_dirs()))
+        return
 
     try:
         import PIL  # noqa: F401
@@ -482,6 +509,25 @@ def main():
             cfg = json.load(f) or {}
 
     theme_id = args.theme or (cfg or {}).get("theme")
+
+    # ---- 字体预设：CLI > config.font.preset > system（老行为）
+    preset = (args.font_preset
+              or ((cfg or {}).get("font") or {}).get("preset")
+              or fonts.DEFAULT_PRESET)
+    if preset not in fonts.PRESETS:
+        print("[!] 未登记的字体预设 {!r}，退回 {}".format(preset, fonts.DEFAULT_PRESET),
+              file=sys.stderr)
+        preset = fonts.DEFAULT_PRESET
+    if preset != fonts.DEFAULT_PRESET and not fonts.available(preset):
+        print("[!] 字体预设 {} 的字体文件没配齐（查过 {}），退回 {}".format(
+            preset, "、".join(fonts.font_dirs()), fonts.DEFAULT_PRESET), file=sys.stderr)
+        preset = fonts.DEFAULT_PRESET
+    FONT_PRESET = preset
+    if preset != fonts.DEFAULT_PRESET:
+        print("[i] 字体预设：{}（{}  标题={}  正文={}）".format(
+            preset, fonts.PRESETS[preset]["label"],
+            os.path.basename(fonts.pick(preset, "title", quiet=True) or "缺"),
+            os.path.basename(fonts.pick(preset, "body", quiet=True) or "缺")))
 
     theme = None
     if not args.dark:
