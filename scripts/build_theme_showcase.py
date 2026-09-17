@@ -346,7 +346,17 @@ def write_index(out_root, built, title):
 def patch_config(cfg, t, theme_id, src_dir, tdir, title_prefix):
     cfg = json.loads(json.dumps(cfg))
     art = cfg.setdefault("article", {})
-    art["title"] = "{}Agent Loop 运行原理 · {}".format(title_prefix, t["name"])
+    # 标题 =「<前缀> <文章主标题> · <主题名>」。文章名从源 config 取，**不写死** ——
+    # 写死的话换一篇稿子跑这个脚本，标题就跟内容对不上了；主标题只取冒号前那段，
+    # 给前缀与主题名留位置，最后按微信 32 字硬上限裁一下。
+    base = (art.get("title") or "文章").strip()
+    base = re.split(r"[:：]", base)[0].strip() or base
+    prefix = (title_prefix or "").strip()
+    suffix = " · " + t["name"]
+    room = 32 - len(suffix) - (len(prefix) + 1 if prefix else 0)
+    if 0 < room < len(base):
+        base = base[:room]
+    art["title"] = (prefix + " " + base if prefix else base) + suffix
     art["digest"] = ("同一篇文章用「{}」主题（{}）排版：七环节流程图、着色代码块、"
                      "对比表格与卡片组件，用来横向对比六套预设的呈现效果。"
                      ).format(t["name"], theme_id)

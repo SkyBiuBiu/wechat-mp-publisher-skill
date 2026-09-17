@@ -22,6 +22,7 @@ stderr 说一句，绝不静默变丑：
     wenkai  霞鹜文楷 LXGW WenKai：楷体骨架，温润、辨识度高
     serif   思源宋体 Noto Serif SC 标题 + 思源黑体 Noto Sans SC 正文
     sans    思源黑体 Noto Sans SC：现代黑体，小字号最清晰
+    rounded MiSans：圆润科技风（标题 Demibold / 正文 Regular）
 
 用法：
     python scripts/fonts.py                 # 列出可用预设与命中情况

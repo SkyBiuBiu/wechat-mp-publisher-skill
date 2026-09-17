@@ -7,6 +7,26 @@
 
 版本号同步保存在根目录 `VERSION` 文件，打 tag 时用 `v<版本号>`（例：`v0.1.0`）。
 
+## [0.9.1] - 2026-09-17
+
+0.9.0 交付后的一轮完整自查，把漏改的地方补齐。
+
+### Fixed
+
+- **主题样张的标题不再写死文章名**：`build_theme_showcase.py` 原先把"Agent Loop 运行原理"
+  硬编码进标题，换一篇稿子跑这个脚本标题就跟内容对不上了。现在从源 `config.json` 的
+  `article.title` 取主标题（只取冒号前那段），前缀与标题之间补上分隔空格，
+  并按微信 32 字硬上限自动裁剪。
+- **删除草稿不再把截断的 media_id 扔给微信**：`publish.py delete` 现在先校验 id 长度，
+  截断的 id 直接提示改用 `list --full` 取完整值；40007 的错误码提示也从
+  "封面素材可能被删了"改为列出两种真实原因（id 截断 / 素材已删）。
+
+### Docs
+
+- 预设清单补齐 `rounded`：`fonts.py` 模块文档串、`config.example.json` 的 `_font` 说明。
+- 0.9.0 段补记：`rounded`(MiSans) 预设、半截字体文件的 sfnt 完整性校验、
+  以及被宽 `except` 吞掉的 `_axis_name` 未定义问题。
+
 ## [0.9.0] - 2026-09-17
 
 封面与流程图可以换字体了，并且**换的是同一套字体**；流程图多了一条**本地渲染**通道 ——
@@ -18,8 +38,9 @@ mermaid.ink（字体在**对方服务器**上找）—— 两边都不认"预设
 
 ### Added
 
-- **`scripts/fonts.py`：字体预设的唯一入口。** 四个预设 —— `system`（系统黑体，默认）/
-  `wenkai`（霞鹜文楷）/ `serif`（思源宋体标题 + 思源黑体正文）/ `sans`（思源黑体）。
+- **`scripts/fonts.py`：字体预设的唯一入口。** 五个预设 —— `system`（系统黑体，默认）/
+  `wenkai`（霞鹜文楷）/ `serif`（思源宋体标题 + 思源黑体正文）/ `sans`（思源黑体）/
+  `rounded`（MiSans，圆润科技风：标题 Demibold + 正文 Regular）。
   封面与流程图**共用这一份清单**：Pillow 要文件路径、浏览器要族名 + `@font-face`，
   两边各写一份必然漂成"封面换了字、图没换"。查找顺序 `WMP_FONT_DIR` →
   `<skill>/assets/fonts/` → `~/.workbuddy/fonts/` → 系统字体，缺哪个角色退回哪个角色
@@ -47,6 +68,13 @@ mermaid.ink（字体在**对方服务器**上找）—— 两边都不认"预设
   还容易被误判成"字体没换成功"。
 - **Pillow 的轴名是 bytes**（`b'Weight'`），`str()` 之后是 `"b'weight'"`，
   与 `"weight"` 匹配不上 → 字重设置静默失效。已按字节解码后比对。
+- **半截字体文件也会被选中**：Pillow 的 `truetype` 是惰性加载，下载到一半的字体能"成功打开"，
+  渲染时才缺字（现象是封面画成一堆默认位图字，且不报错）。现在按 sfnt 表目录校验
+  `offset + length <= 文件长度`（TTC 先解 `ttcf` 头），坏文件跳过继续找下一个候选，
+  而不是整体退回系统字体。
+- **宽 `except` 吞掉了"函数不存在"**：`_weight_range` 调用了一个从未定义的 `_axis_name`，
+  `NameError` 被 `except Exception: pass` 静默吃掉，字重区间查询一直在用默认值。
+  现已补上定义（bytes 轴名统一解码），两处共用。
 
 ### Notes
 

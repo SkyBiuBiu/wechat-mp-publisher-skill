@@ -70,7 +70,7 @@ ERR_HINT = {
     -1: "微信系统繁忙，稍后重试",
     40001: "AppSecret 错误，或 access_token 已失效",
     40005: "文件格式不支持。正文图片仅支持 jpg/png",
-    40007: "media_id 无效（封面素材可能被删了）",
+    40007: "media_id 无效。常见原因：① id 被截断（用 `list --full` 取完整值）② 草稿或封面素材已被删",
     40009: "图片体积或尺寸太大。uploadimg 要求单张 < 1MB",
     40013: "AppID 不合法。检查大小写、有没有多余空格",
     40125: "AppSecret 不合法",
@@ -483,7 +483,13 @@ def cmd_draft(cfg, args):
 def cmd_delete(cfg, args):
     """删除草稿箱里的指定草稿。破坏性操作，必须显式给 --media-id。"""
     if not args.media_id:
-        die("delete 必须用 --media-id 指定要删除的草稿。可以用 list 先查 media_id。")
+        die("delete 必须用 --media-id 指定要删除的草稿。可以用 list --full 先查**完整** media_id。")
+    # 截断的 media_id 会被微信判成 40007（"无效"），现象很像"草稿已被删"，
+    # 实际只是列表默认把 id 显示短了 —— 这里先挡一道，省得对着错误码猜。
+    if len(args.media_id) < 40 or args.media_id.endswith("..."):
+        die("这个 media_id 看起来是**截断**过的（{} 位）。"
+            "`list` 默认截断显示，请用 `list --full` 取完整 id 再删。"
+            .format(len(args.media_id)))
     token = get_access_token(cfg["appid"], cfg["appsecret"], force=args.force,
                              cache_path=token_cache_path(args.config))
     if not args.yes:

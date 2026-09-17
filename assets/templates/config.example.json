@@ -23,7 +23,7 @@
     "dir": "assets"
   },
 
-  "_font": "字体预设：system(系统黑体) / wenkai(霞鹜文楷) / serif(思源宋体+思源黑体) / sans(思源黑体)。字体文件不进分发包，放到 ~/.workbuddy/fonts/ 或设 WMP_FONT_DIR；缺了自动退回系统字体并在 stderr 说明。封面与流程图共用这一套名字，建议两处一致",
+  "_font": "字体预设：system(系统黑体) / wenkai(霞鹜文楷) / serif(思源宋体+思源黑体) / sans(思源黑体) / rounded(MiSans 圆润科技风)。字体文件不进分发包，放到 ~/.workbuddy/fonts/ 或设 WMP_FONT_DIR；缺了自动退回系统字体并在 stderr 说明。封面与流程图共用这一套名字，建议两处一致",
   "font": {
     "preset": "system"
   },
