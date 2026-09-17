@@ -120,6 +120,13 @@
   实测生成出来只有一行 `Full Changelog` 链接，等于发了条没有说明的 Release。
   现在提取 `## [x.y.z]` 段落作为正文，并自动附上「上一版…本版」的 compare 链接
   （上一版由 tag 列表按版本号降序取，不依赖当前 tag 是否已存在）。
+- **步骤顺序固定为「自检 → 打 tag → 检出 tag → 打包 → 发 Release」**。打包前先
+  `git checkout refs/tags/<tag>`，保证 Release 附带的 zip 与 tag 内容严格一致。
+  原顺序是「打包 → 打 tag」，一旦版本推上去之后 main 又多了别的提交（例如补修 CI），
+  事后补发 Release 就会挂一个与 tag 对不上的包——`build_zip.py` 是会把
+  `.github/workflows/` 和 `CHANGELOG.md` 打进包里的，这些恰好最容易在发版后被改动。
+  已实测确认该不一致确实发生（v0.5.0 补发时包的来源提交与 tag 指向的提交不同），
+  故把顺序纠正过来。
 
 ### Notes
 

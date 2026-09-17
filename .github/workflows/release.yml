@@ -10,6 +10,12 @@ name: Release
 #   workflow（防止递归触发）。所以「workflow A 打 tag → workflow B 监听 v* 发版」
 #   这种拆法永远不会生效——B 一次都不会跑。必须自包含。
 #   代价：本文件同时承担「打 tag」与「发版」两件事，改的时候别拆开。
+#
+# 步骤顺序为什么是「自检 → 打 tag → 检出 tag → 打包 → 发 Release」
+#   1) 先自检再打 tag：不留指向坏提交的 tag。
+#   2) 打完 tag 再检出 tag 才打包：保证 Release 附带的 zip 与 tag 内容严格一致。
+#      若直接拿工作区打包，一旦版本推上去之后 main 又多了别的提交（比如补修 CI），
+#      事后补发 Release 就会挂一个和 tag 对不上的包。
 
 on:
   push:
@@ -83,10 +89,37 @@ jobs:
           echo "OK：标签与 VERSION 一致"
 
       # ---------------------------------------------------------------
-      # 先自检 + 打包，都过了才动 tag —— 避免留下指向坏提交的 tag
+      # 先在待发布的提交上自检，过了才动 tag
       # ---------------------------------------------------------------
       - name: 发布前自检（必须全绿）
         run: python scripts/validate_skill.py
+
+      - name: 打 tag（分支推送 / 手动触发时；标签已存在则跳过）
+        if: ${{ !startsWith(github.ref, 'refs/tags/') }}
+        run: |
+          set -e
+          TAG="${{ steps.ver.outputs.tag }}"
+          git fetch --tags --force --quiet origin
+          if [ -n "$(git ls-remote --tags origin "refs/tags/$TAG")" ]; then
+            echo "标签 $TAG 已存在于远端，跳过创建"
+          else
+            git config user.name  "github-actions[bot]"
+            git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+            git tag -a "$TAG" -m "Release $TAG"
+            git push origin "refs/tags/$TAG"
+            echo "已创建并推送标签 $TAG"
+          fi
+
+      # ---------------------------------------------------------------
+      # 检出 tag 再打包 / 写说明：保证 Release 产物与 tag 内容严格一致
+      # ---------------------------------------------------------------
+      - name: 对齐到标签所指提交
+        run: |
+          set -e
+          TAG="${{ steps.ver.outputs.tag }}"
+          git fetch --tags --force --quiet origin
+          git checkout --force --quiet "refs/tags/$TAG"
+          echo "产物将以 $TAG（$(git rev-parse --short HEAD)）为准构建"
 
       - name: 生成分发包
         run: python scripts/build_zip.py
@@ -113,7 +146,7 @@ jobs:
           body = m.group(1).strip()
 
           # 上一版标签：排序列出全部 tag，剔除当前版本后取最高那个。
-          # 不依赖当前 tag 已经存在（生成说明时 tag 还没建）。
+          # 不依赖当前 tag 已经存在（生成说明时 tag 未必已建）。
           subprocess.run(["git", "fetch", "--tags", "--force", "--quiet", "origin"],
                          capture_output=True)
           tags = subprocess.run(["git", "tag", "-l", "v*", "--sort=-v:refname"],
@@ -128,21 +161,6 @@ jobs:
           pathlib.Path("release_notes.md").write_text(body, encoding="utf-8")
           print(f"已生成 release_notes.md：{len(body)} 字符，上一版 {prev or '（无）'}")
           PY
-
-      - name: 自动打 tag（分支推送时；标签已存在则跳过）
-        if: ${{ !startsWith(github.ref, 'refs/tags/') }}
-        run: |
-          set -e
-          TAG="${{ steps.ver.outputs.tag }}"
-          if [ -n "$(git ls-remote --tags origin "refs/tags/$TAG")" ]; then
-            echo "标签 $TAG 已存在于远端，跳过创建"
-          else
-            git config user.name  "github-actions[bot]"
-            git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-            git tag -a "$TAG" -m "Release $TAG"
-            git push origin "refs/tags/$TAG"
-            echo "已创建并推送标签 $TAG"
-          fi
 
       - name: 创建 Release 并附加 zip
         uses: softprops/action-gh-release@v2
