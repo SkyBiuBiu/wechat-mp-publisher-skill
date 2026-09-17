@@ -77,11 +77,11 @@
 <section style="margin:0 0 32px;background:#fff;border:1.5px solid rgba(5,150,105,0.15);border-radius:20px;overflow:hidden;box-shadow:0 4px 20px rgba(0,0,0,0.06);width:100%;">
   <section style="padding:32px 28px 28px;">
     <section style="display:flex;align-items:center;gap:8px;margin-bottom:28px;">
-      <span style="width:6px;height:6px;background:#059669;border-radius:50%;"><span leaf=""><br></span></span>
-      <span style="font-size:11px;font-weight:700;letter-spacing:3px;color:#059669;"><span leaf="">{{顶部标签}}</span></span>
+      <span style="width:6px;height:6px;background:#059669;border-radius:50%;flex:0 0 auto;"><span leaf=""><br></span></span>
+      <span style="font-size:10px;font-weight:700;letter-spacing:1.5px;color:#059669;white-space:nowrap;"><span leaf="">{{顶部标签}}</span></span>
       <section style="flex:1;height:1px;overflow:hidden;background:linear-gradient(to right,rgba(5,150,105,0.12),transparent);"><span leaf=""><br></span></section>
-      <span style="font-size:10px;color:#D1D5DB;font-weight:600;"><span leaf="">{{日期}}</span></span>
     </section>
+    <!-- 窄屏适配：顶部标签 10px/字距1.5px + nowrap，288px 窄屏也单行；日期别放这行（挤占空间导致标签折行），要放就并入 {{副标题关键词}} -->
     <section style="display:flex;align-items:center;gap:20px;">
       <section style="flex:1;min-width:0;">
         <p style="font-size:15px;color:#D1D5DB;margin:0 0 6px;text-decoration:line-through;letter-spacing:0.5px;">
@@ -106,13 +106,16 @@
       </section>
     </section>
   </section>
-  <section style="background:linear-gradient(135deg,#059669,#10B981);padding:12px 28px;display:flex;align-items:center;justify-content:space-between;">
-    <p style="font-size:12px;color:rgba(255,255,255,0.9);margin:0;font-weight:600;letter-spacing:0.5px;">
+  <!-- 底部品牌条：品牌一行 + 标签一行的确定性两行结构。不要塞回同一行：
+       品牌条最窄要扛 288px（320dp 手机），单行放"品牌 + 2 标签"需 ≥310px，
+       靠 flex-wrap/auto-margin 让它"能挤就挤"在 X5 内核上会把标签整个挤出边界（实测） -->
+  <section style="background:linear-gradient(135deg,#059669,#10B981);padding:11px 18px 12px;">
+    <p style="font-size:10px;color:rgba(255,255,255,0.9);margin:0 0 7px;font-weight:600;letter-spacing:0.4px;white-space:nowrap;">
       <span leaf="">{{底部左侧文字}}</span>
     </p>
     <section style="display:flex;gap:4px;">
-      <span style="background:rgba(255,255,255,0.2);padding:1px 6px;border-radius:3px;font-size:8px;color:#fff;font-weight:600;"><span leaf="">{{标签1}}</span></span>
-      <span style="background:rgba(255,255,255,0.2);padding:1px 6px;border-radius:3px;font-size:8px;color:#fff;font-weight:600;"><span leaf="">{{标签2}}</span></span>
+      <span style="background:rgba(255,255,255,0.2);padding:2px 7px;border-radius:3px;font-size:8px;color:#fff;font-weight:600;white-space:nowrap;"><span leaf="">{{标签1}}</span></span>
+      <span style="background:rgba(255,255,255,0.2);padding:2px 7px;border-radius:3px;font-size:8px;color:#fff;font-weight:600;white-space:nowrap;"><span leaf="">{{标签2}}</span></span>
     </section>
   </section>
 </section>
@@ -124,11 +127,11 @@
 <section style="margin:0 0 32px;background:#fff;border:1.5px solid rgba(5,150,105,0.15);border-radius:20px;overflow:hidden;box-shadow:0 4px 20px rgba(0,0,0,0.06);width:100%;">
   <section style="padding:32px 28px 28px;">
     <section style="display:flex;align-items:center;gap:8px;margin-bottom:28px;">
-      <span style="width:6px;height:6px;background:#059669;border-radius:50%;"><span leaf=""><br></span></span>
-      <span style="font-size:11px;font-weight:700;letter-spacing:3px;color:#059669;"><span leaf="">{{顶部标签}}</span></span>
+      <span style="width:6px;height:6px;background:#059669;border-radius:50%;flex:0 0 auto;"><span leaf=""><br></span></span>
+      <span style="font-size:10px;font-weight:700;letter-spacing:1.5px;color:#059669;white-space:nowrap;"><span leaf="">{{顶部标签}}</span></span>
       <section style="flex:1;height:1px;overflow:hidden;background:linear-gradient(to right,rgba(5,150,105,0.12),transparent);"><span leaf=""><br></span></section>
-      <span style="font-size:10px;color:#D1D5DB;font-weight:600;"><span leaf="">{{日期}}</span></span>
     </section>
+    <!-- 窄屏适配：顶部标签 10px/字距1.5px + nowrap，288px 窄屏也单行；日期别放这行（挤占空间导致标签折行），要放就并入 {{副标题关键词}} -->
     <section>
       <p style="font-size:15px;color:#D1D5DB;margin:0 0 6px;text-decoration:line-through;letter-spacing:0.5px;">
         <span leaf="">{{划线旧认知}}</span>
@@ -148,13 +151,16 @@
       </p>
     </section>
   </section>
-  <section style="background:linear-gradient(135deg,#059669,#10B981);padding:12px 28px;display:flex;align-items:center;justify-content:space-between;">
-    <p style="font-size:12px;color:rgba(255,255,255,0.9);margin:0;font-weight:600;letter-spacing:0.5px;">
+  <!-- 底部品牌条：品牌一行 + 标签一行的确定性两行结构。不要塞回同一行：
+       品牌条最窄要扛 288px（320dp 手机），单行放"品牌 + 2 标签"需 ≥310px，
+       靠 flex-wrap/auto-margin 让它"能挤就挤"在 X5 内核上会把标签整个挤出边界（实测） -->
+  <section style="background:linear-gradient(135deg,#059669,#10B981);padding:11px 18px 12px;">
+    <p style="font-size:10px;color:rgba(255,255,255,0.9);margin:0 0 7px;font-weight:600;letter-spacing:0.4px;white-space:nowrap;">
       <span leaf="">{{底部左侧文字}}</span>
     </p>
     <section style="display:flex;gap:4px;">
-      <span style="background:rgba(255,255,255,0.2);padding:1px 6px;border-radius:3px;font-size:8px;color:#fff;font-weight:600;"><span leaf="">{{标签1}}</span></span>
-      <span style="background:rgba(255,255,255,0.2);padding:1px 6px;border-radius:3px;font-size:8px;color:#fff;font-weight:600;"><span leaf="">{{标签2}}</span></span>
+      <span style="background:rgba(255,255,255,0.2);padding:2px 7px;border-radius:3px;font-size:8px;color:#fff;font-weight:600;white-space:nowrap;"><span leaf="">{{标签1}}</span></span>
+      <span style="background:rgba(255,255,255,0.2);padding:2px 7px;border-radius:3px;font-size:8px;color:#fff;font-weight:600;white-space:nowrap;"><span leaf="">{{标签2}}</span></span>
     </section>
   </section>
 </section>
@@ -172,7 +178,7 @@
 
 ## 组件 3 目录 toc-scroll（横向滚动目录）
 
-2 个及以上章节时生成。第一个卡片绿色高亮，最后一个固定为"写在最后"（PART ///）。
+2 个及以上章节时生成。第一个卡片绿色高亮，最后一个固定为"写在最后"（PART {{N}}，编号顺延，**别照抄此处的占位**）。
 
 ```html
 <section style="margin:0 20px 32px;">
@@ -209,10 +215,11 @@
         <span leaf="">{{副标题}}</span>
       </p>
     </section>
-    <!-- 最后一个（写在最后） -->
+    <!-- 最后一个（写在最后）；编号顺延（如 PART 06）。"///"母题只用于组件 4 的章节大编号，
+         抄进 toc 小标签会像渲染坏了（实测被当 bug 反馈） -->
     <section style="display:inline-block;white-space:normal;vertical-align:top;width:110px;background:#fff;border:1px solid #E5E7EB;border-radius:12px;padding:12px;box-shadow:0 2px 6px rgba(0,0,0,0.04);">
       <p style="font-size:9px;font-weight:700;color:#9CA3AF;letter-spacing:1px;margin:0 0 5px;">
-        <span leaf="">PART ///</span>
+        <span leaf="">PART {{N}}</span>
       </p>
       <p style="font-size:13px;font-weight:800;color:#111827;margin:0 0 3px;">
         <span leaf="">写在最后</span>
@@ -224,6 +231,16 @@
   </section>
 </section>
 ```
+
+**窄屏与等高的硬规矩**（违反过，实测被反馈）：
+
+- 卡片内宽只有 110−24=**86px**，而正文根节点的 `letter-spacing:0.5px` 会被继承——
+  副标题实际可用宽比看起来更窄。**{{副标题}} 必须单行放下**（约 ≤8 个汉字宽），
+  放不下就删字，别指望折行：一折行这张卡就比别的高，整排参差不齐。
+  把握不准就在副标题 `<p>` 上加 `letter-spacing:normal;`（"短期 · 工作 · 长期"这种
+  带间隔号的 6 字副题，不加正好折行、加了才单行）。
+- 排版完按 288px 宽截图检查一遍这排卡片：等高、无折词、滚动裁切在整卡边界。
+- 顶部"📦 N Parts + Conclusion + 👉 滑动"一行在 288px 下仍单行，不用改。
 
 ---
 
